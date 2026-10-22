@@ -1,0 +1,27 @@
+{
+  "name": "@reloj/core",
+  "version": "1.4.0",
+  "private": true,
+  "description": "Lógica pura (sin UI) del Reloj de Arena: motor del temporizador, ajustes, catálogos, simulación de arena y persistencia.",
+  "license": "MIT",
+  "author": "Sebastián Zaruha (https://github.com/SebastianZaruha)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SebastianZaruha/reloj-de-arena.git",
+    "directory": "packages/core"
+  },
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^5.0.5",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.5"
+  }
+}

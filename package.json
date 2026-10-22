@@ -1,0 +1,43 @@
+{
+  "name": "reloj-de-arena",
+  "version": "1.4.0",
+  "private": true,
+  "description": "Reloj de Arena: temporizador minimalista con forma de reloj de arena (monorepo).",
+  "license": "MIT",
+  "author": "Sebastián Zaruha (https://github.com/SebastianZaruha)",
+  "homepage": "https://github.com/SebastianZaruha/reloj-de-arena#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SebastianZaruha/reloj-de-arena.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SebastianZaruha/reloj-de-arena/issues"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run test --workspaces --if-present",
+    "test:coverage": "npm run test:coverage --workspaces --if-present",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test",
+    "mobile": "npm run start --workspace apps/mobile",
+    "web": "npm run web --workspace apps/mobile"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "^58.0.4",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "typescript-eslint": "^8.72.0"
+  }
+}

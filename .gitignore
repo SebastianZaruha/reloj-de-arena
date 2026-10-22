@@ -1,0 +1,82 @@
+# ─────────────────────────────────────────────────────────────
+# Reloj de Arena · .gitignore del monorepo
+# ─────────────────────────────────────────────────────────────
+
+# Dependencias
+node_modules/
+
+# Expo / Metro / builds web
+.expo/
+.expo-shared/
+dist/
+web-build/
+expo-env.d.ts
+.metro-health-check*
+# CanvasKit para la web: lo copia `npm install` (postinstall de apps/mobile)
+apps/mobile/public/canvaskit.wasm
+
+# Proyectos nativos: los genera `npx expo prebuild` a partir de app.json.
+# No contienen nada editado a mano (los permisos bloqueados están en app.json).
+/apps/mobile/android/
+/apps/mobile/ios/
+.kotlin/
+.gradle/
+.cxx/
+local.properties
+*.iml
+
+# Binarios de Android / iOS
+*.apk
+*.aab
+*.ipa
+*.apks
+*.dSYM.zip
+
+# Claves de firma y credenciales (¡nunca al repositorio!)
+*.keystore
+!debug.keystore
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+google-services.json
+GoogleService-Info.plist
+credentials.json
+play-store-*.json
+
+# Variables de entorno
+.env
+.env.*
+!.env.example
+
+# Tests
+coverage/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Editores (se comparten solo las extensiones recomendadas de VS Code)
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*~
+
+# Entregas en zip
+*.zip

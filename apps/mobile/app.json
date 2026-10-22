@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Reloj de Arena",
+    "slug": "reloj-de-arena",
+    "version": "1.4.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#E6DED4",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6DED4",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.sebastianzaruha.relojdearena",
+      "blockedPermissions": ["android.permission.ACTIVITY_RECOGNITION"]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": ["expo-font", "expo-audio"],
+    "scheme": "relojdearena"
+  }
+}

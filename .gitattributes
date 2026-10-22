@@ -1,0 +1,9 @@
+# Finales de línea LF en todos los sistemas (Prettier comprueba LF; así en Windows
+# `npm run check` no falla aunque Git tenga core.autocrlf=true).
+* text=auto eol=lf
+
+# Binarios
+*.png binary
+*.jpg binary
+*.mp3 binary
+*.wasm binary
