@@ -49,6 +49,6 @@ licencia; para una versión publicada (Google Play) conviene mostrarlos en una p
 
 | Recurso                                            | Origen                                                                  |
 | -------------------------------------------------- | ----------------------------------------------------------------------- |
-| `apps/mobile/assets/sounds/fin.mp3` (aviso de fin) | Aportado por el autor. **Origen y licencia pendientes de confirmar.**   |
+| `apps/mobile/assets/sounds/fin.mp3` (aviso de fin) | "New Notification 07", de [Pixabay](https://pixabay.com/es/sound-effects/pel%C3%ADculas-y-efectos-especiales-new-notification-07-210334/). [Pixabay Content License](https://pixabay.com/es/service/license-summary/): uso gratuito, también comercial; no se permite redistribuirlo como archivo suelto. |
 | Iconos y splash (`apps/mobile/assets/*.png`)       | Plantilla de `create-expo-app` (MIT, Expo). Se sustituirán por propios. |
 | Capturas (`docs/capturas/`)                        | Generadas a partir de la propia app.                                    |
