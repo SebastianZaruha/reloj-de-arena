@@ -9,6 +9,7 @@ import { DEFAULT_CONTENT_ID, getContent } from '../catalog/contents';
 import { DEFAULT_MODEL_ID, getHourglassModel } from '../catalog/hourglassModels';
 import {
   CYCLE_PRESET_IDS,
+  DEFAULT_CYCLE_PRESET,
   DEFAULT_CUSTOM_CYCLE,
   sanitizeCycleConfig,
   type CycleConfig,
@@ -66,7 +67,7 @@ export const DEFAULT_SETTINGS: Settings = Object.freeze({
   haptics: true,
   sound: true,
   sessionMode: 'single',
-  cyclePreset: '25-5',
+  cyclePreset: DEFAULT_CYCLE_PRESET,
   customCycle: DEFAULT_CUSTOM_CYCLE,
   updatedAt: 0,
 });

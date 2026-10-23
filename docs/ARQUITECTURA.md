@@ -312,7 +312,7 @@ ciclo 25/5 × 4 rondas es `Trabajo, Descanso, Trabajo, Descanso, Trabajo, Descan
   aunque entre dos fotogramas haya habido varios cambios.
 - **Voltear el móvil** reinicia la fase en curso (en marcha). Si la sesión había terminado,
   empieza de nuevo desde la primera fase.
-- **Preajustes** 25/5, 50/10, 15/3 y 90/15 (4 rondas, `CYCLE_PRESETS`) y **Personalizado**
+- **Preajustes** 15/3, 25/5, 50/10 y 90/15 (4 rondas, `CYCLE_PRESETS`) y **Personalizado**
   (1–180 min por fase siguiendo los mismos escalones que al deslizar, 1–12 rondas;
   `CYCLE_LIMITS`, `stepMinutes`, `stepRounds`).
 - **Ajustes → plan:** `sessionPlanFor(settings)` (en `settings/sessionPlan.ts`) decide el plan.

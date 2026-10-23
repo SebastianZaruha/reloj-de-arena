@@ -33,11 +33,15 @@ export const CYCLE_PRESETS: readonly {
   readonly id: Exclude<CyclePresetId, 'custom'>;
   readonly config: CycleConfig;
 }[] = [
+  // De menor a mayor (1.6). Los ids no cambian: los ajustes guardados siguen valiendo.
+  { id: '15-3', config: { workMin: 15, breakMin: 3, rounds: PRESET_ROUNDS } },
   { id: '25-5', config: { workMin: 25, breakMin: 5, rounds: PRESET_ROUNDS } },
   { id: '50-10', config: { workMin: 50, breakMin: 10, rounds: PRESET_ROUNDS } },
-  { id: '15-3', config: { workMin: 15, breakMin: 3, rounds: PRESET_ROUNDS } },
   { id: '90-15', config: { workMin: 90, breakMin: 15, rounds: PRESET_ROUNDS } },
 ];
+
+/** Preajuste por defecto (el clásico 25/5), independiente del orden en pantalla. */
+export const DEFAULT_CYCLE_PRESET: Exclude<CyclePresetId, 'custom'> = '25-5';
 
 export const CYCLE_PRESET_IDS: readonly CyclePresetId[] = [...CYCLE_PRESETS.map((p) => p.id), 'custom'];
 
@@ -58,7 +62,8 @@ export const FINAL_BREAK = false;
 export function cycleConfigFor(preset: CyclePresetId, custom: CycleConfig): CycleConfig {
   if (preset === 'custom') return sanitizeCycleConfig(custom);
   return (
-    CYCLE_PRESETS.find((p) => p.id === preset)?.config ?? (CYCLE_PRESETS[0] as { config: CycleConfig }).config
+    CYCLE_PRESETS.find((p) => p.id === preset)?.config ??
+    (CYCLE_PRESETS.find((p) => p.id === DEFAULT_CYCLE_PRESET) as { config: CycleConfig }).config
   );
 }
 

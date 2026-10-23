@@ -3,6 +3,7 @@ import {
   activeCycleConfig,
   CYCLE_LIMITS,
   CYCLE_PRESETS,
+  DEFAULT_CYCLE_PRESET,
   cycleConfigFor,
   DEFAULT_CUSTOM_CYCLE,
   DEFAULT_SETTINGS,
@@ -19,13 +20,20 @@ import {
 const MIN = 60_000;
 
 describe('ciclos: preajustes y Personalizado', () => {
-  it('los preajustes son 25/5, 50/10, 15/3 y 90/15, de 4 rondas', () => {
+  it('los preajustes son 15/3, 25/5, 50/10 y 90/15 (de menor a mayor), de 4 rondas', () => {
     expect(CYCLE_PRESETS.map((p) => `${p.config.workMin}/${p.config.breakMin}`)).toEqual([
+      '15/3',
       '25/5',
       '50/10',
-      '15/3',
       '90/15',
     ]);
+    // Los ids guardados no cambian con el orden, y el preajuste por defecto sigue siendo 25/5.
+    expect(CYCLE_PRESETS.map((p) => p.id)).toEqual(['15-3', '25-5', '50-10', '90-15']);
+    expect(DEFAULT_CYCLE_PRESET).toBe('25-5');
+    expect(cycleConfigFor('nada' as never, { workMin: 1, breakMin: 1, rounds: 1 })).toMatchObject({
+      workMin: 25,
+      breakMin: 5,
+    });
     expect(CYCLE_PRESETS.every((p) => p.config.rounds === 4)).toBe(true);
   });
 

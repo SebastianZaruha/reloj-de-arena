@@ -70,7 +70,7 @@ un fondo cálido y difuso. Todo se maneja con gestos; los ajustes viven en un me
   abajo, tocando fuera o con «atrás» (Escape en la web).
 - **Tema claro, oscuro o automático** (sigue al sistema), con un fundido suave al cambiar.
 - **Tiempos rápidos:** 5, 10, 15, 25, 45 y 60 min con un toque (deslizar sigue funcionando).
-- **Ciclos trabajo/descanso:** 25/5, 50/10, 15/3 y 90/15 (4 rondas) o **Personalizado**
+- **Ciclos trabajo/descanso:** 15/3, 25/5, 50/10 y 90/15 (4 rondas) o **Personalizado**
   (1–180 min, 1–12 rondas). Al cambiar de fase el reloj **se da la vuelta solo**, suena un
   aviso suave, vibra y aparece un rótulo discreto («Trabajo 2/4», «Descanso 2/4»). Voltear el
   móvil reinicia la fase en curso.
