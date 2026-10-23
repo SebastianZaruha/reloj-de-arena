@@ -3,32 +3,32 @@
  * mismo lienzo que el reloj (se pasa como `children` de <Hourglass>).
  *
  * ¿Por qué aquí y no con un `BlurView` nativo? Porque Skia ya está en la app
- * (sin dependencias nativas nuevas) y porque así el vidrio desenfoca lo que
- * hay detrás en el mismo lienzo: el reloj. La parte de React Native de la
- * hoja (textos y botones) va encima, con fondo transparente, y se mueve con
- * el MISMO shared value (`top`), así que vidrio y contenido nunca se separan.
+ * (sin dependencias nativas nuevas) y porque un desenfoque de fondo
+ * («backdrop») solo puede desenfocar lo que se ha dibujado ANTES en el mismo
+ * lienzo: el reloj. La parte de React Native de la hoja (textos y botones)
+ * va encima, con fondo transparente, y se mueve con el MISMO shared value
+ * (`top`), así que vidrio y contenido nunca se separan.
  *
  * Capas:
  *   1. Velo muy suave sobre toda la pantalla (aparece al abrir).
  *   2. Sombra difusa encima del canto de la hoja.
- *   3. Dentro de la forma de la hoja: la foto desenfocada de la escena
- *      (`scene.backdrop`, la prepara <Hourglass>), el velo y el tinte.
+ *   3. BackdropBlur recortado a la forma de la hoja + tinte del tema.
  *   4. Brillo de 1 px en el canto superior (como el canto de un vidrio).
  *
- * Coste (1.8.2): la GPU solo estira una imagen pequeña. Hasta la 1.8 era un
- * BackdropBlur (leer la pantalla ya dibujada, carísimo en los móviles) y en
- * la 1.8.1 una copia desenfocada del reloj, que al abrir obligaba a la GPU a
- * preparar shaders nuevos: la hoja tardaba ~2 s en salir en un Samsung A55.
- * Ver hourglass/frostedBackdrop.ts.
+ * Coste: solo se monta mientras la hoja está abierta o animándose.
  *
- * Está SIEMPRE montado (1.8.2): con la hoja cerrada todo queda fuera de la
- * pantalla o con opacidad 0, y Skia no dibuja nada. Así abrir no monta nada
- * en el lienzo y el primer fotograma ya sale completo.
+ * Historia (1.8.2): este es otra vez el vidrio de la 1.6. En la 1.8.1 se
+ * cambió el BackdropBlur por una copia desenfocada del reloj dibujada dentro
+ * de la hoja, y en un Samsung A55 la hoja tardaba ~2 s en salir (también
+ * nada más abrir la app, con el reloj quieto): esa copia, con los shaders del
+ * vidrio dentro de una capa desenfocada, obligaba a la GPU a preparar
+ * programas nuevos al abrir. El BackdropBlur iba fluido en la 1.6 en ese
+ * mismo móvil; lo que lo hacía ir a tirones en la 1.8 era el resto (la
+ * pantalla re-renderizándose 4 veces por segundo, las llamadas nativas y los
+ * fotogramas encolados), ya arreglado en la 1.8.1.
  */
 import {
-  FilterMode,
-  Image,
-  MipmapMode,
+  BackdropBlur,
   Fill,
   Group,
   LinearGradient,
@@ -40,16 +40,12 @@ import {
 } from '@shopify/react-native-skia';
 import { interpolateColor, useDerivedValue, type SharedValue } from 'react-native-reanimated';
 
-import type { HourglassScene } from '../../hourglass';
 import { DARK_THEME, LIGHT_THEME } from '../../theme/theme';
 
 /** Radio de las esquinas superiores de la hoja. */
 export const SHEET_RADIUS = 30;
-/** La foto es pequeña: se estira con filtrado lineal (ya está desenfocada). */
-/** El tinte de cada tema, opaco (fondo de reserva del vidrio). */
-const BASE_LIGHT = 'rgb(236, 230, 222)';
-const BASE_DARK = 'rgb(38, 32, 27)';
-const SMOOTH = { filter: FilterMode.Linear, mipmap: MipmapMode.None } as const;
+/** Desenfoque del vidrio (px). */
+const BLUR = 26;
 /** Alto de la sombra sobre el canto. */
 const SHADOW_H = 28;
 
@@ -65,11 +61,9 @@ interface Props {
   readonly openness: SharedValue<number>;
   /** 0 = tema claro, 1 = oscuro (animado). */
   readonly themeProgress: SharedValue<number>;
-  /** La escena del reloj: su foto desenfocada para detrás del vidrio. */
-  readonly scene: HourglassScene;
 }
 
-export function FrostedPanel({ width, height, top, openness, themeProgress, scene }: Props) {
+export function FrostedPanel({ width, height, top, openness, themeProgress }: Props) {
   // La forma se prolonga por debajo de la pantalla para que las esquinas
   // redondeadas de abajo nunca se vean.
   const shape = useDerivedValue(() =>
@@ -83,9 +77,6 @@ export function FrostedPanel({ width, height, top, openness, themeProgress, scen
   const tint = useDerivedValue(() =>
     interpolateColor(themeProgress.value, [0, 1], [L.panelTint, D.panelTint]),
   );
-  // Por si la foto no existe aún (o la GPU no la pudo hacer): el mismo tinte,
-  // opaco, para que nunca se vea el reloj nítido detrás del menú.
-  const base = useDerivedValue(() => interpolateColor(themeProgress.value, [0, 1], [BASE_LIGHT, BASE_DARK]));
   const edge = useDerivedValue(() =>
     interpolateColor(themeProgress.value, [0, 1], [L.panelEdge, D.panelEdge]),
   );
@@ -101,20 +92,9 @@ export function FrostedPanel({ width, height, top, openness, themeProgress, scen
       <Rect rect={shadowRect}>
         <LinearGradient start={shadowStart} end={shadowEnd} colors={shadowColors} />
       </Rect>
-      <Group clip={shape}>
-        <Fill color={base} />
-        <Image
-          image={scene.backdrop}
-          x={0}
-          y={0}
-          width={width}
-          height={height}
-          fit="fill"
-          sampling={SMOOTH}
-        />
-        <Fill color={scrim} opacity={openness} />
+      <BackdropBlur blur={BLUR} clip={shape}>
         <Fill color={tint} />
-      </Group>
+      </BackdropBlur>
       <Group clip={edgeBand}>
         <RoundedRect rect={shape} style="stroke" strokeWidth={1} color={edge} />
       </Group>
