@@ -9,6 +9,88 @@ funcionamiento interno en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md).
 > APK de desarrollo. A partir de la publicación en GitHub basta con `git pull`; las
 > instrucciones «Cómo actualizar» se conservan como referencia.
 
+## 1.6.0 — Inglés, ayuda de gestos y arena más natural
+
+Una entrega de pulido tras probar la 1.5 en el móvil: la app habla **inglés** (con selector),
+tiene una **pantalla de ayuda de gestos**, la arena **se vacía en embudo** y ya no se raya tras
+dar la vuelta, y el toque en el botón del menú ya no empieza ni pausa el reloj. **No hay
+cambios nativos:** sigue valiendo el APK de desarrollo de la 1.3.
+
+<p align="center">
+  <img src="docs/capturas/17-menu-es-claro.png" width="22%" alt="Menú en español, tema claro" />
+  <img src="docs/capturas/17-menu-en-oscuro.png" width="22%" alt="Menú en inglés, tema oscuro, con ciclos" />
+  <img src="docs/capturas/16-gestos-es-claro.png" width="22%" alt="Ayuda de gestos en español" />
+  <img src="docs/capturas/17-pausa-en-oscuro.png" width="22%" alt="Pausa con el dedo en inglés: «Paused»" />
+</p>
+
+### Cómo actualizar desde la 1.5
+
+1. `git pull`.
+2. **No hace falta `npm install`** (no cambia ninguna dependencia: el idioma del sistema se lee
+   con `Intl` y los iconos de la ayuda se dibujan con Skia, que ya estaba).
+3. **No hace falta APK nuevo**: todo es JavaScript; sigue valiendo el APK de desarrollo de la 1.3.
+4. `npm run mobile` y abre la app. Tus ajustes de la 1.5 se migran solos (versión 3: idioma en
+   «Automático»). La ayuda de gestos sale una vez al abrir la app tras actualizar.
+
+### Novedades
+
+| Qué                         | Cómo                                                                                                                                                                                                                        | Dónde                                                   |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Inglés y selector de idioma | Sección «Idioma» / «Language» en el menú: **Español · English · Automático** (sigue al sistema: `es*` → español, el resto → inglés). Todo traducido, también la accesibilidad. Diccionarios tipados con un test de paridad. | `core/src/i18n/`, `src/i18n/I18n.tsx`                   |
+| Ayuda de gestos             | Pantalla «Gestos» / «Gestures» a pantalla completa con el reloj desenfocado detrás: una fila por gesto con un icono de línea. Se abre con un «?» en la cabecera del menú y sale sola una vez en el primer arranque.         | `components/GesturesHelp.tsx`                           |
+| Botón del menú              | En Android, tocarlo también empezaba o pausaba el reloj. Ahora hay una **zona de guarda** de 84 px en su esquina donde los gestos del reloj no hacen nada, y tocar en cualquier punto de ella abre el menú.                 | `core/src/geometry/menuGuard.ts`, `MenuButton.tsx`      |
+| Sonido de cambio de fase    | «Swoosh 07» de Pixabay, más suave.                                                                                                                                                                                          | `assets/sounds/cambio.mp3`                              |
+| Arena tras dar la vuelta    | Sin rayas ni enrejado en V tras un cambio de fase o al voltear (`followColumn`: la masa cae entera), sin granos colgando bajo el cuello (`flushSource`) y recuperando el ritmo fluyendo, sin «teletransportes».             | `core/src/sim/`                                         |
+| Arena igual a cualquier fps | A pocos fps (el navegador sin GPU) la arena da los pasos que le tocan y el chorro se parte en subpasos de ≤ 1/50 s. A 60 fps (el móvil) todo es idéntico a la 1.5.                                                          | `useSandEngine.ts`, `core/src/sim/stream.ts`            |
+| Vaciado en embudo           | El bulbo de arriba se vacía desde el cuello y la superficie baja en **V**, irregular, sin canal vertical; también en reposo, al reiniciar y al voltear. La sincronización con el tiempo no cambia.                          | `core/src/sim/` (`collapseColumn`), `engine` (`crater`) |
+| Preajustes en orden         | 15/3, 25/5, 50/10, 90/15 y Personalizado. Los guardados no cambian.                                                                                                                                                         | `core/src/session/cycles.ts`                            |
+| Pausa con el dedo           | Muestra el mismo «Pausa» grande y centrado que al tumbar el móvil, con un desenfoque ligero (2,5 px) que entra y sale con un fundido.                                                                                       | `PauseLabel.tsx`, `Hourglass.tsx`                       |
+| Tiempo y textos             | Tiempo 30 → 34 px; pista y rótulo de fase 12 → 13,5 px. El borde inferior no se mueve.                                                                                                                                      | `TimeDisplay.tsx`                                       |
+| Deslizar con un dedo        | El tiempo solo se elige deslizando con **un** dedo; con dos no pasa nada (no hay pellizco).                                                                                                                                 | `TimerScreen.tsx` (`maxPointers: 1`)                    |
+| Log de la entrada (dev)     | En desarrollo, la consola dice por qué la entrada no gira (p. ej. animaciones del sistema desactivadas). La lógica no cambia.                                                                                               | `intro/useIntro.ts`                                     |
+
+### Decisiones tomadas (se pueden cambiar)
+
+- **Automático sin dato de idioma → español.** Cualquier idioma que no sea español → inglés.
+- **La ayuda de gestos sale una vez también a quien actualiza** (`gesturesSeen` empieza en
+  `false`); se marca como vista en cuanto se muestra.
+- **Voltear no rellena el bulbo de arriba de golpe:** como un reloj real, la arena que estaba
+  abajo pasa a caer desde arriba en el tiempo reiniciado.
+- **Zona de guarda de 84 px** (más que los 72–80 pedidos, para cubrir también el dedo que
+  apoya un poco fuera); con el móvil volteado está abajo a la izquierda, donde se ve el botón.
+- No había código de pellizco: el arreglo fue limitar el deslizamiento a un dedo.
+- El estilo del botón del menú no cambia (el engranaje que se ve en el móvil es el botón del
+  cliente de desarrollo de Expo, no de la app).
+
+### Capturas
+
+En `docs/capturas/` (versión web, 390×844 a 2x), en español e inglés y en claro y oscuro:
+`17-menu-*`, `17-ciclo-*` (Trabajo/Work 2/4 en claro, Descanso/Break 2/4 en oscuro),
+`17-pausa-*` y `16-gestos-*`. Se retiran `14-menu-*`, `14-ciclo-*`, `15-pausa-toque-*` y
+`12-pausa-*`.
+
+### Pruebas
+
+- **Core:** 159 tests en 20 archivos (nuevos: `flowAfterTurn.test.ts`, `embudo.test.ts`,
+  `i18n.test.ts`, `menuGuard.test.ts`; ampliados los de ciclos y ajustes).
+  `npm run check` pasa entero.
+- **Web, de extremo a extremo con Playwright** (Chromium sin GPU, 390×844 y 360 de ancho):
+  idioma automático (es-ES → español, en-US → inglés), selector y persistencia, textos y
+  etiquetas en los dos idiomas, la hoja cabe a 360 × 640 y se cierra arrastrando; la ayuda de
+  gestos (sale sola una vez, «?», ×, Escape, no arranca el reloj); la zona del botón del menú
+  (toques, pulsación larga y deslizamientos que empiezan en la esquina abren el menú y no
+  tocan el reloj, también con los toques llegando al propio reloj, que es lo que pasaba en
+  Android; justo fuera, el toque sí arranca); la pausa con el dedo; sin errores en la consola.
+- **Memoria y rendimiento:** no se crea memoria nueva por fotograma (el vaciado en embudo y
+  los subpasos del chorro reutilizan los mismos búferes); a 60 fps la arena hace el mismo
+  trabajo que en la 1.5.
+
+### Pendiente de probar en Android
+
+Que el toque en el botón del menú ya no arranque el reloj (la lógica nativa es la de
+`GestureStateManager.fail`), la ayuda de gestos con «atrás» y TalkBack, y el idioma automático
+con el móvil en inglés.
+
 ## 1.5.0 — Menú de ajustes, temas y ciclos trabajo/descanso (fase 3)
 
 La **fase 3**: un menú discreto con vidrio esmerilado, tema claro/oscuro/automático, tiempos

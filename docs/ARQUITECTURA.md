@@ -21,12 +21,14 @@ versión, el [CHANGELOG](../CHANGELOG.md).
 12. [Menú de ajustes (1.5)](#10-menú-de-ajustes)
 13. [Temas claro, oscuro y automático (1.5)](#11-temas-claro-oscuro-y-automático)
 14. [Entrada animada (1.5)](#12-entrada-animada)
-15. [Simulador de inclinación en el navegador](#simulador-de-inclinación-en-el-navegador)
-16. [Personalizar colores (fondo claro)](#personalizar-colores-fondo-claro)
-17. [Decisiones clave y por qué](#decisiones-clave-y-por-qué)
-18. [Accesibilidad](#accesibilidad)
-19. [Limitaciones conocidas](#limitaciones-conocidas)
-20. [Scripts](#scripts)
+15. [Idiomas: español e inglés (1.6)](#13-idiomas-español-e-inglés)
+16. [Gestos: ayuda y zona del botón del menú (1.6)](#14-gestos-ayuda-y-zona-del-botón-del-menú)
+17. [Simulador de inclinación en el navegador](#simulador-de-inclinación-en-el-navegador)
+18. [Personalizar colores (fondo claro)](#personalizar-colores-fondo-claro)
+19. [Decisiones clave y por qué](#decisiones-clave-y-por-qué)
+20. [Accesibilidad](#accesibilidad)
+21. [Limitaciones conocidas](#limitaciones-conocidas)
+22. [Scripts](#scripts)
 
 ## Estructura del monorepo
 
@@ -53,11 +55,12 @@ reloj-de-arena/
 │       │   ├── session/    ← planes, ciclos (preajustes, límites) y MOTOR DE SESIONES
 │       │   ├── settings/   ← modelo de ajustes + validación (sanitize) + plan según ajustes
 │       │   ├── catalog/    ← catálogos: contenidos (arena; agua más adelante) y modelos de reloj
-│       │   ├── geometry/   ← perfil matemático (silueta) del reloj
+│       │   ├── geometry/   ← perfil matemático (silueta) del reloj y zona de guarda del botón del menú
+│       │   ├── i18n/       ← textos en español e inglés (diccionarios tipados) e idioma automático
 │       │   ├── physics/    ← vectores 2D, filtro del acelerómetro, pausa/volteo
 │       │   ├── sim/        ← simulación granular de la arena + controlador de flujo
 │       │   └── persistence/← interfaces de almacenamiento + implementación local
-│       └── test/           ← tests de Vitest (140 tests)
+│       └── test/           ← tests de Vitest (159 tests)
 │
 └── apps/
     └── mobile/             ← @reloj/mobile: la app Expo / React Native
@@ -73,7 +76,7 @@ reloj-de-arena/
             ├── components/TimeDisplay.tsx ← el tiempo digital de abajo y el rótulo de fase
             ├── components/HourglassBoundary.tsx ← error boundary: recupera el reloj si Skia falla
             ├── components/menu/    ← MENÚ DE AJUSTES (ver sección 10)
-            │   ├── MenuButton.tsx  ← botón de dos rayas (arriba a la derecha)
+            │   ├── MenuButton.tsx  ← botón de dos rayas (arriba a la derecha; su área es toda la zona de guarda)
             │   ├── SettingsSheet.tsx ← la hoja: secciones, arrastre, «atrás»
             │   ├── FrostedPanel.tsx  ← el vidrio esmerilado (Skia, dentro del lienzo del reloj)
             │   ├── useSheet.ts     ← estado y animación de abrir/cerrar
@@ -86,6 +89,8 @@ reloj-de-arena/
             ├── haptics/            ← vibración (expo-haptics): haptics.ts + useTimerHaptics
             ├── motion/             ← acelerómetro (expo-sensors) → LiveMotion; simulador web
             ├── components/PauseLabel.tsx ← rótulo «Pausa» (al tumbar el móvil o al tocar)
+            ├── components/GesturesHelp.tsx ← pantalla de ayuda «Gestos» (sección 14)
+            ├── i18n/I18n.tsx       ← idioma de la app: proveedor y useT() (sección 13)
             ├── recovery/           ← guardar/recuperar la cuenta si hay que recargar (web)
             ├── storage/            ← adaptador AsyncStorage → interfaz del core
             ├── theme/theme.ts      ← paletas clara y oscura (también las del menú) y resolveScheme
@@ -346,7 +351,7 @@ constante se ignora.
 ### 10. Menú de ajustes
 
 ```
- MenuButton (dos rayas, 48×48) ──► useSheet.show() ──► offset: alto → 0 (340 ms)
+ MenuButton (dos rayas, 84×84) ──► useSheet.show() ──► offset: alto → 0 (340 ms)
                                         │
           ┌─────────────────────────────┴──────────────────────────┐
           ▼                                                        ▼
@@ -367,13 +372,16 @@ constante se ignora.
   desactivan y el velo y la hoja lo tapan; con la hoja cerrada, la hoja no recibe toques.
 - **Alto:** el del contenido; si no cabe (pantallas bajas) se queda en casi toda la pantalla
   y el contenido se desplaza (`ScrollView`).
-- **Secciones:** Tema (segmentado), Tiempos rápidos (chips redondos de 5 a 60 min), Sesión
+- **Cabecera:** «Ajustes» con el resumen de la sesión debajo y, en la misma línea que el
+  título, un «?» discreto que abre la ayuda de gestos (sección 14).
+- **Secciones:** Tema (segmentado), Idioma (Español · English · Automático), Tiempos rápidos (chips redondos de 5 a 60 min), Sesión
   (Sesión única / Ciclos, preajustes, Personalizado con steppers y un resumen) y Sonido /
   Vibración (interruptores). La sección que no está activa se atenúa pero sigue funcionando:
   tocar un tiempo rápido pasa a sesión única; tocar un preajuste o un stepper pasa a ciclos.
   Tocar un stepper con un preajuste elegido pasa a Personalizado copiando sus valores.
-- **Todo se guarda** al momento en los ajustes (`SettingsStore` sobre AsyncStorage; versión 2
-  de los ajustes, con migración automática desde la 1).
+- **Todo se guarda** al momento en los ajustes (`SettingsStore` sobre AsyncStorage; versión 3
+  de los ajustes, con migración automática desde la 1 y la 2: `language` y `gesturesSeen` son
+  nuevos en la 1.6).
 
 ### 11. Temas claro, oscuro y automático
 
@@ -398,9 +406,50 @@ con un fundido al final.
 - **Solo en frío:** una variable de módulo (`introPlayed` en `intro/useIntro.ts`) recuerda que
   ya se ha mostrado. Volver de segundo plano no recrea el módulo, así que no se repite.
 - **Reducir movimiento:** solo un fundido de 250 ms, sin giro ni escala.
+- **Log en desarrollo (1.6):** con `__DEV__`, cuando la entrada no gira, `useIntro` escribe en la
+  consola por qué: «reducir movimiento» activado (en Android, las animaciones desactivadas) o
+  que ya se mostró en este proceso. La lógica de la entrada no cambia.
 - **Coste:** todo son shared values animados en el hilo de UI; React no se re-renderiza durante
   la animación. Los grupos de Skia necesitan una capa (`saveLayer`) para desvanecer un
   `<Picture>`; esas capas **solo existen mientras dura la animación** (o el giro de fase).
+
+### 13. Idiomas: español e inglés
+
+- **Diccionarios tipados en el core** (`core/src/i18n/messages.ts`): `es` es la referencia y
+  `en: Messages = typeof es`, así que a `en` no le puede faltar ni sobrar una clave, y las
+  funciones (`phaseLabel(kind, round, rounds)`, `minutes(n)`…) tienen los mismos parámetros.
+  Un test (`i18n.test.ts`) lo comprueba también en tiempo de ejecución (mismas claves, mismos
+  tipos, misma aridad, sin tildes españolas en inglés). `describeDuration(ms, idioma)` dice las
+  duraciones para el lector de pantalla en los dos idiomas.
+- **Selector** en el menú: Español · English · Automático (ajuste `language`: `'es' | 'en' |
+'system'`, por defecto `'system'`). Automático usa el idioma del sistema
+  (`Intl.DateTimeFormat().resolvedOptions().locale`, sin dependencias nativas nuevas) y lo
+  vuelve a leer al volver la app a primer plano: `es*` → español; cualquier otro → inglés; sin
+  datos → español (`resolveLanguage`).
+- **App:** `I18nProvider` (en `App.tsx`) y `useT()` dan los textos a cada componente. Están
+  traducidos todos los textos visibles, las etiquetas, pistas y valores de accesibilidad y los
+  anuncios. En la web también se pone `<html lang>`.
+
+### 14. Gestos: ayuda y zona del botón del menú
+
+- **Pantalla «Gestos» / «Gestures»** (`components/GesturesHelp.tsx`): a pantalla completa sobre
+  el reloj (que se desenfoca detrás, como en la pausa de lado), título pequeño en versalitas, ×
+  fina y una fila por gesto con un icono de línea dibujado en Skia (un trazado SVG por icono).
+  Se abre con el «?» del menú y **sale sola una vez**, después de la entrada, en el primer
+  arranque (ajuste `gesturesSeen`, también para quien actualiza). Se cierra con la ×, «atrás»
+  o Escape; es una vista modal para el lector de pantalla. Mientras está abierta los gestos
+  del reloj se apagan.
+- **Zona de guarda del botón del menú** (`core/src/geometry/menuGuard.ts`, `inMenuGuard`): un
+  cuadrado de 84 px bajo el margen seguro, en la esquina del botón (arriba a la derecha; con el
+  móvil volteado, abajo a la izquierda, porque la capa del menú gira 180°). Gesture Handler
+  reconoce los gestos en nativo, aparte del sistema de toques de React Native, así que en
+  Android un toque sobre el botón también empezaba o pausaba el reloj. Ahora los tres gestos
+  del reloj (tocar, mantener y deslizar) **fallan** en cuanto el dedo baja en la zona
+  (`onTouchesDown` → `GestureStateManager.fail`) y tocar y mantener vuelven a comprobar el
+  punto al activarse. El área táctil del botón es toda la zona: tocar en cualquier punto de la
+  esquina abre el menú. Prueba web: `e2e-guarda.mjs` (con el botón y, haciendo el botón
+  transparente a los toques, con los toques llegando al reloj como en Android).
+- **Deslizar solo con un dedo** (`maxPointers: 1`): con dos dedos no pasa nada.
 
 ## Simulador de inclinación en el navegador
 
@@ -490,6 +539,9 @@ Los demás colores (texto del tiempo, rótulo «Pausa», vidrio, sombra, arena) 
   seleccionadas, interruptores con rol de switch, steppers ajustables (deslizar arriba/abajo con
   TalkBack) que leen «25 minutos», «4 rondas». Zonas táctiles de 44 px o más. Al abrir se
   anuncia «Ajustes» y el resto de la pantalla queda oculto al lector.
+- **Idioma:** todas las etiquetas, pistas, valores y anuncios están en español e inglés.
+- **Ayuda de gestos:** vista modal; al abrirse se anuncia «Gestos»; la × se llama «Cerrar
+  gestos». El «?» del menú se llama «Ver los gestos».
 - **Ciclos:** se anuncia cada cambio de fase («Descanso, ronda 2 de 4») y el final.
 - La pantalla se mantiene encendida mientras corre la arena.
 
