@@ -247,6 +247,9 @@ export function TimerScreen({ settings, fonts }: Props) {
     enabled: gesturesOn && view.status !== 'running',
     activeOffsetY: [-10, 10],
     failOffsetX: [-60, 60],
+    // La duración solo se elige deslizando con UN dedo, en vertical. Con dos
+    // dedos (p. ej. al intentar pellizcar) el gesto no hace nada.
+    maxPointers: 1,
     onActivate: () => {
       dragStart.current = adjustableMs();
       ticker.current?.reset(dragStart.current);

@@ -111,7 +111,7 @@ puede testear sin emuladores y reutilizar en la futura app de escritorio.
 
 ```
  ┌───────────── TimerScreen ─────────────┐
- │ gestos (pan/tap/long press) y menú ──► useSession ──► motor de sesiones del core (fases encadenadas)
+ │ gestos (pan vertical de 1 dedo/tap/long press) y menú ──► useSession ──► motor de sesiones del core (fases encadenadas)
  │                                   │
  │                         getSnapshot() (tiempo calculado con marcas de tiempo)
  │                                   ▼

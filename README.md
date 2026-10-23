@@ -56,14 +56,14 @@ dónde está cada cosa en el código) y **[CHANGELOG.md](CHANGELOG.md)** (histor
 La pantalla entera es el reloj: un vidrio fino y transparente con arena que cae de verdad sobre
 un fondo cálido y difuso. Todo se maneja con gestos; los ajustes viven en un menú discreto:
 
-| Gesto                       | Acción                                                        |
-| --------------------------- | ------------------------------------------------------------- |
-| Deslizar **arriba / abajo** | Más / menos tiempo (1 min – 3 h). La arena cambia en vivo.    |
-| **Tocar**                   | Empezar · pausar («Pausa») · reanudar; al terminar, de nuevo. |
-| **Mantener pulsado**        | Reiniciar.                                                    |
-| **Inclinar** el móvil       | La arena se desliza y la luz y la sombra se mueven.           |
-| **Tumbar de lado** (≈90°)   | Pausa (reloj desenfocado y «Pausa»); de pie, sigue.           |
-| **Voltear** (180°)          | Como uno real: empieza de cero y cae la arena del otro lado.  |
+| Gesto                       | Acción                                                                  |
+| --------------------------- | ----------------------------------------------------------------------- |
+| Deslizar **arriba / abajo** | Más / menos tiempo (1 min – 3 h), con un dedo. La arena cambia en vivo. |
+| **Tocar**                   | Empezar · pausar («Pausa») · reanudar; al terminar, de nuevo.           |
+| **Mantener pulsado**        | Reiniciar.                                                              |
+| **Inclinar** el móvil       | La arena se desliza y la luz y la sombra se mueven.                     |
+| **Tumbar de lado** (≈90°)   | Pausa (reloj desenfocado y «Pausa»); de pie, sigue.                     |
+| **Voltear** (180°)          | Como uno real: empieza de cero y cae la arena del otro lado.            |
 
 - **Arena simulada grano a grano** (autómata celular): montón con su ángulo de reposo, cráter
   arriba, avalanchas al inclinar, chorro de granos sueltos que acelera, salpica y rueda.
