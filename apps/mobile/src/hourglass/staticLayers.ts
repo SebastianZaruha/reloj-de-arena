@@ -2,15 +2,21 @@
  * Capas del VIDRIO (fondo, sombra y reflejos): se graban en SkPictures (listas
  * de órdenes de dibujo que Skia reproduce muy rápido).
  *
- *   capa trasera:  fondo → sombra en la mesa → cuerpo del vidrio (refracción)
- *   capa frontal:  reflejos del vidrio → contorno
+ *   fondo:          degradado, luz difusa y viñeta
+ *   sombra:         sombra del reloj sobre la mesa
+ *   cuerpo:         cuerpo del vidrio (refracción del fondo)
+ *   capa frontal:   reflejos del vidrio → contorno
+ *
+ * Desde la 1.5 fondo, sombra y cuerpo son pictures SEPARADOS (antes eran uno
+ * solo): así el reloj puede girar (introducción y cambio de fase) mientras
+ * el fondo se queda quieto y la sombra se desvanece al «levantarlo».
  *
  * Desde la 1.3 la luz, los reflejos y la sombra se mueven con la inclinación
  * del móvil, así que estas capas se vuelven a grabar cuando la inclinación
  * cambia (como mucho una vez por fotograma; lo decide useSandEngine).
  * Para que regrabar sea BARATO, `GlassPainter` crea UNA vez todo lo que se
  * puede reutilizar (Paints, filtros de desenfoque, el grabador, los arrays de
- * uniforms) y en cada grabación solo nacen los 3 shaders (Skia no deja
+ * uniforms) y en cada grabación solo nacen los shaders (Skia no deja
  * cambiar los uniforms de un shader ya creado), que se liberan nada más
  * terminar: el SkPicture guarda sus propias referencias.
  *
@@ -167,34 +173,46 @@ export class GlassPainter {
     this.causticPaint.setMaskFilter(causticBlur);
   }
 
-  /** Graba la capa trasera: fondo, sombra y cuerpo del vidrio. */
-  recordBack(tilt: Vec2): SkPicture {
+  /**
+   * Graba el FONDO (degradado, luz difusa, viñeta). Con paralaje: se mueve
+   * un poco al revés que el vidrio al inclinar el móvil.
+   */
+  recordBackground(tilt: Vec2): SkPicture {
     this.assertAlive();
-    const { layout } = this;
     const canvas = this.recorder.beginRecording(this.bounds);
-
-    // 1) Fondo (con un poco de paralaje: se mueve al revés que el vidrio).
-    const bgU = this.bgU;
-    bgU.uOffset[0] = tilt.x * PARALLAX.background;
-    bgU.uOffset[1] = tilt.y * PARALLAX.background;
-    const bgShader = this.background.makeShader(this.bgPacker.pack(bgU));
+    const bgShader = this.makeBackgroundShader(tilt);
     this.bgPaint.setShader(bgShader);
     canvas.drawRect(this.bounds, this.bgPaint);
+    const picture = this.recorder.finishRecordingAsPicture();
+    // El picture ya guarda sus referencias: soltamos las nuestras.
+    this.bgPaint.setShader(null);
+    safeDispose(bgShader);
+    return picture;
+  }
 
-    // 2) Sombra sobre la "mesa" (se desplaza con la inclinación).
+  /** Graba la SOMBRA del reloj sobre la mesa (capa propia desde la 1.5). */
+  recordShadow(tilt: Vec2): SkPicture {
+    this.assertAlive();
+    const canvas = this.recorder.beginRecording(this.bounds);
     this.drawShadow(canvas, tilt);
+    return this.recorder.finishRecordingAsPicture();
+  }
 
-    // 3) Cuerpo del vidrio: refracta el fondo (que recibe como shader hijo).
+  /**
+   * Graba el CUERPO del vidrio: refracta el fondo, que recibe como shader
+   * hijo (por eso crea su propio shader de fondo, que libera al terminar).
+   */
+  recordBody(tilt: Vec2): SkPicture {
+    this.assertAlive();
+    const canvas = this.recorder.beginRecording(this.bounds);
+    const bgShader = this.makeBackgroundShader(tilt);
     const bodyU = this.bodyU;
     bodyU.uLight[0] = tilt.x;
     bodyU.uLight[1] = tilt.y;
     const bodyShader = this.glassBody.makeShaderWithChildren(this.bodyPacker.pack(bodyU), [bgShader]);
     this.bodyPaint.setShader(bodyShader);
-    canvas.drawPath(layout.outerPath, this.bodyPaint);
-
+    canvas.drawPath(this.layout.outerPath, this.bodyPaint);
     const picture = this.recorder.finishRecordingAsPicture();
-    // El picture ya guarda sus referencias: soltamos las nuestras.
-    this.bgPaint.setShader(null);
     this.bodyPaint.setShader(null);
     safeDispose(bodyShader);
     safeDispose(bgShader);
@@ -243,6 +261,14 @@ export class GlassPainter {
       ...this.masks,
       this.recorder,
     ].forEach(safeDispose);
+  }
+
+  /** Shader del fondo con el paralaje de la inclinación (lo libera quien lo pide). */
+  private makeBackgroundShader(tilt: Vec2) {
+    const bgU = this.bgU;
+    bgU.uOffset[0] = tilt.x * PARALLAX.background;
+    bgU.uOffset[1] = tilt.y * PARALLAX.background;
+    return this.background.makeShader(this.bgPacker.pack(bgU));
   }
 
   private assertAlive(): void {

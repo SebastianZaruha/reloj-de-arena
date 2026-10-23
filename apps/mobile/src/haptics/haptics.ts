@@ -13,6 +13,7 @@
  * |   tumbar el móvil)    |                                                        |
  * | Clic al deslizar      | Android: `AndroidHaptics.Clock_Tick` (el "clic" de los  |
  * |                       | selectores de hora del sistema); iOS: `selectionAsync`  |
+ * | Cambio de fase (1.5)  | DOBLE impacto medio (120 ms entre los dos): «cambio»    |
  * | Fin del tiempo        | aviso de éxito  (`NotificationFeedbackType.Success`)    |
  *
  * Reglas:
@@ -88,11 +89,19 @@ export function playTimerHaptic(event: TimerHaptic): void {
     case 'pause':
       safely(impactHeavy);
       break;
+    case 'phase':
+      // Dos toques seguidos: se distingue del de empezar sin mirar la pantalla.
+      safely(impactMedium);
+      setTimeout(() => safely(impactMedium), PHASE_SECOND_TAP_MS);
+      break;
     case 'finished':
       safely(success);
       break;
   }
 }
+
+/** Separación entre los dos toques del cambio de fase (ms). */
+const PHASE_SECOND_TAP_MS = 120;
 
 /** "Clic" de rueda dentada al cambiar de escalón deslizando. */
 export function playSelectionTick(): void {

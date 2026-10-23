@@ -6,20 +6,20 @@
  * La versión web está en `sessionRecovery.web.ts` (Metro elige el archivo
  * según la plataforma, igual que con `bootstrap.ts` / `bootstrap.web.ts`).
  */
-import type { TimerState } from '@reloj/core';
+import type { SessionState } from '@reloj/core';
 
 /** ¿Se puede recargar la app entera para recuperar Skia? */
 export const canReloadForRecovery = false;
 
-/** Guarda el temporizador y recarga (no aplica en nativo). */
-export function saveTimerAndReload(_state: TimerState): void {}
+/** Guarda la sesión y recarga (no aplica en nativo). */
+export function saveSessionAndReload(_state: SessionState): void {}
 
 /** Cuándo fue la última recarga de recuperación (nunca en nativo). */
 export function lastRecoveryReloadAt(): number | null {
   return null;
 }
 
-/** Devuelve (y borra) un temporizador guardado antes de recargar. */
-export function takeRecoveredTimer(_now: number): TimerState | null {
+/** Devuelve (y borra) una sesión guardada antes de recargar. */
+export function takeRecoveredSession(_now: number): SessionState | null {
   return null;
 }

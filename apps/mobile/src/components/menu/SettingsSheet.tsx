@@ -1,0 +1,423 @@
+/**
+ * Hoja de ajustes (concepto A de la fase 3): sube desde abajo sobre el reloj
+ * como un vidrio esmerilado. Aquí está la parte de React Native (textos y
+ * controles, con fondo transparente); el vidrio lo dibuja `FrostedPanel` en
+ * el lienzo de Skia, siguiendo el mismo `offset`.
+ *
+ * Se cierra:
+ *   - arrastrando hacia abajo (gesto de Gesture Handler en el hilo de UI),
+ *   - tocando fuera (el velo de TimerScreen),
+ *   - con el botón «atrás» de Android (BackHandler; en la web, con Escape),
+ *   - con el asa (botón accesible «Cerrar ajustes»).
+ *
+ * Si la pantalla es baja y el contenido no cabe, el cuerpo se desplaza
+ * (ScrollView) y entonces solo se arrastra desde la cabecera.
+ */
+import {
+  CYCLE_LIMITS,
+  CYCLE_PRESETS,
+  activeCycleConfig,
+  stepMinutes,
+  stepRounds,
+  type CycleConfig,
+  type CyclePresetId,
+  type SessionMode,
+  type Settings,
+  type ThemePreference,
+} from '@reloj/core';
+import { useEffect, useState, type ReactNode } from 'react';
+import {
+  AccessibilityInfo,
+  BackHandler,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
+import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
+import Animated, { Easing, useAnimatedStyle, withTiming, type SharedValue } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
+
+import type { HourglassTheme } from '../../theme/theme';
+import { Chip, Segmented, Stepper, ToggleRow, type SegmentOption } from './controls';
+import { useMenuStyles, type MenuFonts } from './themedStyles';
+import type { SheetState } from './useSheet';
+
+/** Tiempos rápidos (minutos). */
+export const QUICK_TIMES_MIN = [5, 10, 15, 25, 45, 60] as const;
+
+const THEME_OPTIONS: readonly SegmentOption<ThemePreference>[] = [
+  { value: 'light', label: 'Claro' },
+  { value: 'dark', label: 'Oscuro' },
+  { value: 'system', label: 'Automático' },
+];
+
+const MODE_OPTIONS: readonly SegmentOption<SessionMode>[] = [
+  { value: 'single', label: 'Sesión única' },
+  { value: 'cycles', label: 'Ciclos' },
+];
+
+/** Opacidad de la sección que no está en uso (Tiempos rápidos o Ciclos). */
+const INACTIVE_OPACITY = 0.5;
+/** Arrastre (fracción del alto) o velocidad (px/s) a partir de los que se cierra. */
+const CLOSE_FRACTION = 0.22;
+const CLOSE_VELOCITY = 700;
+const MINUTE_MS = 60_000;
+
+type SettingsPatch = Partial<Omit<Settings, 'version' | 'updatedAt'>>;
+
+interface Props {
+  readonly sheet: SheetState;
+  readonly settings: Settings;
+  readonly update: (patch: SettingsPatch) => void;
+  readonly theme: HourglassTheme;
+  readonly themeProgress: SharedValue<number>;
+  readonly fonts: MenuFonts;
+  readonly screenHeight: number;
+  /** Márgenes seguros (muesca, barra de gestos). */
+  readonly safeTop: number;
+  readonly safeBottom: number;
+}
+
+export function SettingsSheet({
+  sheet,
+  settings,
+  update,
+  theme,
+  themeProgress,
+  fonts,
+  screenHeight,
+  safeTop,
+  safeBottom,
+}: Props) {
+  const s = useMenuStyles(themeProgress);
+  const base = { styles: s, fonts, pillShadow: theme.ui.pillShadow };
+  const { open, visible, hide, offset, height } = sheet;
+
+  // ─── Alto: el del contenido, sin pasar de casi toda la pantalla ─────────
+  const maxHeight = screenHeight - safeTop - 56;
+  const [headerH, setHeaderH] = useState(0);
+  const [bodyH, setBodyH] = useState(0);
+  const natural = headerH + bodyH + safeBottom + 14;
+  const sheetHeight = Math.min(natural, maxHeight);
+  const scrollable = natural > maxHeight + 0.5;
+  useEffect(() => {
+    if (headerH > 0 && bodyH > 0) {
+      height.set(sheetHeight);
+      // Escondida del todo, se queda justo por debajo del borde con el alto
+      // nuevo. Ojo: comprobamos `visible` y no `open`; si no, al cerrar este
+      // efecto cortaría la animación de salida (y la hoja «saltaría»).
+      if (!visible) offset.set(sheetHeight + 40);
+    }
+  }, [sheetHeight, headerH, bodyH, visible, height, offset]);
+
+  // ─── Atrás de Android ───────────────────────────────────────────────────
+  useEffect(() => {
+    if (!open) return;
+    AccessibilityInfo.announceForAccessibility('Ajustes');
+    if (Platform.OS === 'web') {
+      // En la web no hay botón «atrás» del sistema: usamos la tecla Escape.
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') hide();
+      };
+      window.addEventListener('keydown', onKey);
+      return () => window.removeEventListener('keydown', onKey);
+    }
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      hide();
+      return true; // ya lo hemos gestionado: no salir de la app
+    });
+    return () => sub.remove();
+  }, [open, hide]);
+
+  // ─── Arrastrar hacia abajo para cerrar ──────────────────────────────────
+  const makePan = (enabled: boolean) => ({
+    enabled: enabled && open,
+    activeOffsetY: 8, // solo hacia abajo
+    failOffsetX: [-24, 24] as [number, number],
+    onUpdate: (e: { translationY: number }) => {
+      'worklet';
+      // Hacia arriba ofrece un poco de resistencia (efecto goma).
+      const y = e.translationY;
+      offset.value = y >= 0 ? y : -Math.sqrt(-y) * 2;
+    },
+    onDeactivate: (e: { translationY: number; velocityY: number }) => {
+      'worklet';
+      if (e.translationY > height.value * CLOSE_FRACTION || e.velocityY > CLOSE_VELOCITY) {
+        scheduleOnRN(hide);
+      } else {
+        offset.value = withTiming(0, { duration: 220, easing: Easing.out(Easing.cubic) });
+      }
+    },
+  });
+  const headerPan = usePanGesture(makePan(true));
+  const bodyPan = usePanGesture(makePan(!scrollable));
+
+  const slide = useAnimatedStyle(() => ({ transform: [{ translateY: offset.value }] }));
+
+  // ─── Valores mostrados ──────────────────────────────────────────────────
+  const cycles = settings.sessionMode === 'cycles';
+  const cycle = activeCycleConfig(settings);
+  const lastMin = Math.round(settings.lastDurationMs / MINUTE_MS);
+  const summary = cycles
+    ? `Ciclos · ${cycle.workMin}/${cycle.breakMin} · ${cycle.rounds} ${cycle.rounds === 1 ? 'ronda' : 'rondas'}`
+    : `Sesión única · ${formatMinutes(lastMin)}`;
+
+  /** Editar un valor de ciclo pasa a «Personalizado» partiendo de lo que se ve. */
+  const editCycle = (patch: Partial<CycleConfig>) =>
+    update({ sessionMode: 'cycles', cyclePreset: 'custom', customCycle: { ...cycle, ...patch } });
+
+  return (
+    <Animated.View
+      style={[styles.sheet, { height: sheetHeight || undefined }, slide]}
+      pointerEvents={open ? 'auto' : 'none'}
+      accessibilityViewIsModal={open}
+      importantForAccessibility={open ? 'yes' : 'no-hide-descendants'}
+      accessibilityElementsHidden={!open}
+      testID="hoja-ajustes"
+    >
+      <GestureDetector gesture={headerPan}>
+        <View onLayout={(e) => setHeaderH(Math.ceil(e.nativeEvent.layout.height))} style={styles.header}>
+          <Pressable
+            onPress={hide}
+            style={styles.grabArea}
+            accessibilityRole="button"
+            accessibilityLabel="Cerrar ajustes"
+            testID="cerrar-ajustes"
+          >
+            <Animated.View style={[styles.grabber, s.grabberBg]} />
+          </Pressable>
+          <View style={styles.headRow}>
+            <Animated.Text
+              style={[styles.title, { fontFamily: fonts.medium }, s.ink]}
+              accessibilityRole="header"
+            >
+              Ajustes
+            </Animated.Text>
+            <Animated.Text
+              style={[styles.summary, { fontFamily: fonts.regular }, s.inkSoft]}
+              numberOfLines={1}
+            >
+              {summary}
+            </Animated.Text>
+          </View>
+        </View>
+      </GestureDetector>
+
+      <GestureDetector gesture={bodyPan}>
+        <ScrollView
+          scrollEnabled={scrollable}
+          showsVerticalScrollIndicator={scrollable}
+          bounces={false}
+          style={styles.scroll}
+          contentContainerStyle={{ paddingBottom: safeBottom + 14 }}
+        >
+          <View onLayout={(e) => setBodyH(Math.ceil(e.nativeEvent.layout.height))} style={styles.body}>
+            {/* Tema */}
+            <Section label="Tema" styles={s} fonts={fonts}>
+              <Segmented
+                {...base}
+                options={THEME_OPTIONS}
+                value={settings.theme}
+                onChange={(theme) => update({ theme })}
+                accessibilityLabel="Tema"
+              />
+            </Section>
+
+            {/* Tiempos rápidos (sesión única) */}
+            <Section label="Tiempos rápidos · min" styles={s} fonts={fonts} dimmed={cycles}>
+              <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Tiempos rápidos">
+                {QUICK_TIMES_MIN.map((min) => (
+                  <Chip
+                    {...base}
+                    key={min}
+                    round
+                    label={String(min)}
+                    selected={!cycles && lastMin === min}
+                    accessibilityLabel={`${min} minutos`}
+                    onPress={() => update({ sessionMode: 'single', lastDurationMs: min * MINUTE_MS })}
+                    testID={`rapido-${min}`}
+                  />
+                ))}
+              </View>
+            </Section>
+
+            {/* Sesión: única o ciclos */}
+            <Section label="Sesión" styles={s} fonts={fonts}>
+              <Segmented
+                {...base}
+                options={MODE_OPTIONS}
+                value={settings.sessionMode}
+                onChange={(sessionMode) => update({ sessionMode })}
+                accessibilityLabel="Tipo de sesión"
+              />
+              <View style={[styles.cycleBlock, !cycles && styles.dimmed]}>
+                <View style={styles.presets} accessibilityRole="radiogroup" accessibilityLabel="Ciclo">
+                  {CYCLE_PRESETS.map((p) => (
+                    <Chip
+                      {...base}
+                      key={p.id}
+                      style={styles.preset}
+                      label={`${p.config.workMin}/${p.config.breakMin}`}
+                      selected={cycles && settings.cyclePreset === p.id}
+                      accessibilityLabel={`${p.config.workMin} minutos de trabajo y ${p.config.breakMin} de descanso`}
+                      onPress={() => update({ sessionMode: 'cycles', cyclePreset: p.id })}
+                      testID={`preajuste-${p.id}`}
+                    />
+                  ))}
+                  <Chip
+                    {...base}
+                    style={styles.presetCustom}
+                    label="Personalizado"
+                    selected={cycles && settings.cyclePreset === 'custom'}
+                    accessibilityLabel="Personalizado"
+                    onPress={() => update({ sessionMode: 'cycles', cyclePreset: 'custom' as CyclePresetId })}
+                    testID="preajuste-custom"
+                  />
+                </View>
+                <Animated.View style={[styles.steppers, s.trackBg]}>
+                  <Stepper
+                    {...base}
+                    label="Trabajo"
+                    value={cycle.workMin}
+                    unit="min"
+                    spoken={`${cycle.workMin} minutos`}
+                    canDecrement={cycle.workMin > CYCLE_LIMITS.minMinutes}
+                    canIncrement={cycle.workMin < CYCLE_LIMITS.maxMinutes}
+                    onStep={(d) => editCycle({ workMin: stepMinutes(cycle.workMin, d) })}
+                    testID="paso-trabajo"
+                  />
+                  <Animated.View style={[styles.vline, s.lineBg]} />
+                  <Stepper
+                    {...base}
+                    label="Descanso"
+                    value={cycle.breakMin}
+                    unit="min"
+                    spoken={`${cycle.breakMin} minutos`}
+                    canDecrement={cycle.breakMin > CYCLE_LIMITS.minMinutes}
+                    canIncrement={cycle.breakMin < CYCLE_LIMITS.maxMinutes}
+                    onStep={(d) => editCycle({ breakMin: stepMinutes(cycle.breakMin, d) })}
+                    testID="paso-descanso"
+                  />
+                  <Animated.View style={[styles.vline, s.lineBg]} />
+                  <Stepper
+                    {...base}
+                    label="Rondas"
+                    value={cycle.rounds}
+                    spoken={`${cycle.rounds} ${cycle.rounds === 1 ? 'ronda' : 'rondas'}`}
+                    canDecrement={cycle.rounds > CYCLE_LIMITS.minRounds}
+                    canIncrement={cycle.rounds < CYCLE_LIMITS.maxRounds}
+                    onStep={(d) => editCycle({ rounds: stepRounds(cycle.rounds, d) })}
+                    testID="paso-rondas"
+                  />
+                </Animated.View>
+                <Animated.Text style={[styles.cycleSummary, { fontFamily: fonts.regular }, s.inkSoft]}>
+                  {`Trabajo ${cycle.workMin} min · Descanso ${cycle.breakMin} min · ${cycle.rounds} ${
+                    cycle.rounds === 1 ? 'ronda' : 'rondas'
+                  }`}
+                </Animated.Text>
+              </View>
+            </Section>
+
+            {/* Sonido y vibración */}
+            <Animated.View style={[styles.hline, s.lineBg]} />
+            <View style={styles.toggles}>
+              <ToggleRow
+                {...base}
+                style={styles.toggle}
+                label="Sonido"
+                value={settings.sound}
+                onChange={(sound) => update({ sound })}
+                testID="interruptor-sonido"
+              />
+              <Animated.View style={[styles.toggleDivider, s.lineBg]} />
+              <ToggleRow
+                {...base}
+                style={styles.toggle}
+                label="Vibración"
+                value={settings.haptics}
+                onChange={(haptics) => update({ haptics })}
+                testID="interruptor-vibracion"
+              />
+            </View>
+          </View>
+        </ScrollView>
+      </GestureDetector>
+    </Animated.View>
+  );
+}
+
+function Section({
+  label,
+  children,
+  styles: s,
+  fonts,
+  dimmed = false,
+}: {
+  label: string;
+  children: ReactNode;
+  styles: ReturnType<typeof useMenuStyles>;
+  fonts: MenuFonts;
+  dimmed?: boolean;
+}) {
+  return (
+    <View style={styles.section}>
+      <Animated.Text
+        style={[styles.label, { fontFamily: fonts.semibold }, s.label, dimmed && styles.dimmed]}
+        accessibilityRole="header"
+      >
+        {label.toUpperCase()}
+      </Animated.Text>
+      <View style={dimmed ? styles.dimmed : null}>{children}</View>
+    </View>
+  );
+}
+
+function formatMinutes(min: number): string {
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m === 0 ? `${h} h` : `${h} h ${m} min`;
+}
+
+const styles = StyleSheet.create({
+  sheet: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  header: { paddingHorizontal: 26 },
+  grabArea: { alignSelf: 'center', width: 88, height: 30, alignItems: 'center', justifyContent: 'center' },
+  grabber: { width: 36, height: 4, borderRadius: 2 },
+  headRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    marginBottom: 18,
+  },
+  title: { fontSize: 19, letterSpacing: 0.2 },
+  summary: { fontSize: 12, flexShrink: 1, marginLeft: 12, textAlign: 'right' },
+  scroll: { flexGrow: 0, flexShrink: 1 },
+  body: { paddingHorizontal: 26 },
+  section: { marginBottom: 22 },
+  label: { fontSize: 10.5, letterSpacing: 1.8, marginBottom: 10 },
+  dimmed: { opacity: INACTIVE_OPACITY },
+  chips: { flexDirection: 'row', justifyContent: 'space-between' },
+  cycleBlock: { marginTop: 10 },
+  presets: { flexDirection: 'row', gap: 6 },
+  // Los preajustes se reparten el sitio que deja «Personalizado», que toma
+  // solo el ancho de su texto (así nunca se corta, ni en móviles estrechos).
+  preset: { flex: 1, paddingHorizontal: 0 },
+  presetCustom: { flexGrow: 0, flexShrink: 0, paddingHorizontal: 12 },
+  steppers: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    borderRadius: 16,
+    marginTop: 10,
+    paddingHorizontal: 2,
+  },
+  vline: { width: StyleSheet.hairlineWidth, marginVertical: 14 },
+  cycleSummary: { fontSize: 12, textAlign: 'center', marginTop: 9, letterSpacing: 0.2 },
+  hline: { height: StyleSheet.hairlineWidth },
+  toggles: { flexDirection: 'row', alignItems: 'center', paddingTop: 2 },
+  toggle: { flex: 1 },
+  toggleDivider: { width: StyleSheet.hairlineWidth, height: 26, marginHorizontal: 20 },
+});

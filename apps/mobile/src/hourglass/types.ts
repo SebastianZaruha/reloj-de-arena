@@ -6,7 +6,7 @@
  * React) y que avisa cuando cambia. En la app la alimenta el acelerómetro
  * (src/motion/); en la versión de escritorio podría ser el ratón.
  */
-import type { Vec2 } from '@reloj/core';
+import type { TimerSnapshot, Vec2 } from '@reloj/core';
 
 /** Lo que necesita el pintor en cada fotograma. */
 export interface PhysicalInputs {
@@ -43,3 +43,11 @@ export const STILL_MOTION: MotionSource = Object.freeze({
   flips: 0,
   subscribe: () => () => undefined,
 });
+
+/**
+ * Foto del temporizador que lee el reloj en cada fotograma. Además del
+ * tiempo, puede traer `transitions`: el número de cambios de fase (ciclos
+ * trabajo/descanso, 1.5). Cuando sube, el reloj se da la vuelta con una
+ * animación y la arena vuelve a empezar (ver useSandEngine).
+ */
+export type HourglassSnapshot = TimerSnapshot & { readonly transitions?: number };

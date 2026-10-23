@@ -48,6 +48,57 @@ export interface HourglassTheme {
   };
   /** Color sólido aproximado del fondo (barra de estado, splash...). */
   readonly solid: string;
+  /** Menú de ajustes (1.5): botón, hoja de vidrio esmerilado y controles. */
+  readonly ui: UiPalette;
+}
+
+/**
+ * Colores del menú. Los textos cumplen contraste WCAG AA (≥ 4.5:1) sobre la
+ * hoja; el icono del botón y el interruptor activo, ≥ 3:1 (elementos no
+ * textuales). Medido sobre el color medio de la hoja (claro ≈ #F1ECE6,
+ * oscuro ≈ #221D19):
+ *
+ * | Token     | Claro   | Ratio | Oscuro  | Ratio |
+ * | --------- | ------- | ----- | ------- | ----- |
+ * | ink       | #4F443B | 8.0   | #E8DCCB | 12.3  |
+ * | inkSoft   | #6B5E53 | 5.3   | #B9AB9C | 7.4   |
+ * | label     | #716458 | 4.9   | #A39586 | 5.7   |
+ * | accent    | #8C7660 | 3.7   | #B59D80 | 6.4   |
+ * | menuIcon  | #8F8272 | 3.0*  | #796C60 | 3.4*  |
+ *
+ * (*) sobre el fondo de la pantalla, no sobre la hoja.
+ */
+export interface UiPalette {
+  /** Texto principal (títulos, opción elegida). */
+  readonly ink: string;
+  /** Texto secundario (opciones no elegidas, unidades). */
+  readonly inkSoft: string;
+  /** Rótulos de sección (MAYÚSCULAS pequeñas). */
+  readonly label: string;
+  /** Fondo de pistas y botones no elegidos. */
+  readonly track: string;
+  /** Fondo de la opción elegida (una «píldora» clara que flota). */
+  readonly pill: string;
+  /** Sombra de la píldora (sintaxis CSS `boxShadow`). */
+  readonly pillShadow: string;
+  /** Interruptor activado. */
+  readonly accent: string;
+  /** Interruptor desactivado. */
+  readonly toggleOff: string;
+  /** Bolita del interruptor. */
+  readonly knob: string;
+  /** Líneas separadoras finas. */
+  readonly line: string;
+  /** Tinte del vidrio esmerilado de la hoja (encima del desenfoque). */
+  readonly panelTint: string;
+  /** Brillo del canto superior de la hoja. */
+  readonly panelEdge: string;
+  /** Velo muy suave sobre el reloj con el menú abierto. */
+  readonly scrim: string;
+  /** Asa de la hoja. */
+  readonly grabber: string;
+  /** Las dos rayitas del botón de menú. */
+  readonly menuIcon: string;
 }
 
 const hex = (h: string): Rgb01 => {
@@ -116,6 +167,23 @@ export const LIGHT_THEME: HourglassTheme = {
     pauseGlow: 'rgba(250, 246, 240, 0.95)',
   },
   solid: LIGHT_BACKGROUND,
+  ui: {
+    ink: '#4F443B',
+    inkSoft: '#6B5E53',
+    label: '#716458',
+    track: 'rgba(92, 78, 64, 0.075)',
+    pill: 'rgba(255, 252, 247, 0.94)',
+    pillShadow: '0px 1px 2px rgba(84, 64, 44, 0.10), 0px 4px 12px rgba(84, 64, 44, 0.07)',
+    accent: '#8C7660',
+    toggleOff: 'rgba(92, 78, 64, 0.16)',
+    knob: '#FFFCF7',
+    line: 'rgba(92, 78, 64, 0.11)',
+    panelTint: 'rgba(244, 239, 232, 0.70)',
+    panelEdge: 'rgba(255, 252, 246, 0.80)',
+    scrim: 'rgba(235, 229, 221, 0.20)',
+    grabber: 'rgba(92, 78, 64, 0.18)',
+    menuIcon: '#8F8272',
+  },
 };
 
 export const DARK_THEME: HourglassTheme = {
@@ -146,10 +214,39 @@ export const DARK_THEME: HourglassTheme = {
     pauseGlow: 'rgba(12, 10, 8, 0.9)',
   },
   solid: '#201B17',
+  ui: {
+    ink: '#E8DCCB',
+    inkSoft: '#B9AB9C',
+    label: '#A39586',
+    track: 'rgba(255, 238, 214, 0.06)',
+    pill: 'rgba(255, 238, 214, 0.14)',
+    pillShadow: '0px 1px 2px rgba(0, 0, 0, 0.35)',
+    accent: '#B59D80',
+    toggleOff: 'rgba(255, 238, 214, 0.14)',
+    knob: '#EDE2D3',
+    line: 'rgba(255, 238, 214, 0.08)',
+    panelTint: 'rgba(30, 25, 21, 0.66)',
+    panelEdge: 'rgba(255, 238, 214, 0.10)',
+    scrim: 'rgba(12, 10, 8, 0.22)',
+    grabber: 'rgba(255, 238, 214, 0.16)',
+    menuIcon: '#796C60',
+  },
 };
 
 export function themeFor(scheme: ColorSchemeName | null | undefined): HourglassTheme {
   return scheme === 'dark' ? DARK_THEME : LIGHT_THEME;
+}
+
+/**
+ * Esquema efectivo según la preferencia guardada: 'system' (Automático)
+ * sigue al sistema; si el sistema no lo dice, claro.
+ */
+export function resolveScheme(
+  preference: 'system' | 'light' | 'dark',
+  system: ColorSchemeName | null | undefined | 'unspecified',
+): ColorSchemeName {
+  if (preference !== 'system') return preference;
+  return system === 'dark' ? 'dark' : 'light';
 }
 
 /** Convierte un color 0..255 del catálogo en 0..1. */

@@ -16,6 +16,15 @@
  *     values" de Reanimated: el Canvas lo dibuja en el hilo de UI sin volver
  *     a renderizar componentes de React.
  *
+ * Cambio de fase (ciclos, 1.5): cuando `transitions` sube en la foto del
+ * temporizador, el reloj se DA LA VUELTA con una animación (`spin`: 0 → π en
+ * TURN_MS, lento-rápido-lento). La arena no se toca durante el giro (va
+ * «pegada» al vidrio, como en uno de verdad); al terminar, en el MISMO
+ * fotograma, la rejilla gira 180° (rotateHalfTurn) y `spin` vuelve a 0: el
+ * dibujo es idéntico, pero ahora la arena está arriba y empieza a caer. Lo
+ * llevamos aquí (en el hilo de JS) y no con withTiming para que el giro y el
+ * cambio de la rejilla nunca se desincronicen ni un fotograma.
+ *
  * Cuando la arena está quieta, el temporizador no corre y el móvil no se
  * mueve, el bucle se DETIENE (cero consumo de batería) hasta que algo lo
  * despierta (un cambio de props o un aviso de la fuente de movimiento).
@@ -36,7 +45,6 @@ import {
   targetSourceGrains,
   type SandSimulation,
   type StreamInput,
-  type TimerSnapshot,
   type TimerStatus,
 } from '@reloj/core';
 import type { SkPicture } from '@shopify/react-native-skia';
@@ -47,7 +55,7 @@ import { useLatest } from '../hooks/useLatest';
 import { PictureSlot, recordEmptyPicture } from './pictureSlot';
 import type { SandPainter, StreamState } from './sandPainter';
 import type { GlassPainter } from './staticLayers';
-import type { MotionSource } from './types';
+import type { HourglassSnapshot, MotionSource } from './types';
 
 export interface SandEngineParams {
   readonly sim: SandSimulation;
@@ -55,21 +63,30 @@ export interface SandEngineParams {
   readonly glass: GlassPainter;
   readonly motion: MotionSource;
   /** Devuelve la foto actual del temporizador. */
-  readonly getSnapshot: () => TimerSnapshot;
+  readonly getSnapshot: () => HourglassSnapshot;
   readonly status: TimerStatus;
   readonly durationMs: number;
   readonly reduceMotion: boolean;
   /** Se llama si el dibujo falla (para que un error boundary lo recupere). */
   readonly onError: (error: unknown) => void;
+  /** Avisa al empezar (true) y al acabar (false) el giro de cambio de fase. */
+  readonly onTurnChange?: (turning: boolean) => void;
 }
 
 export interface SandEngineOutput {
+  readonly background: SharedValue<SkPicture>;
+  readonly shadow: SharedValue<SkPicture>;
+  readonly body: SharedValue<SkPicture>;
   readonly sand: SharedValue<SkPicture>;
-  readonly back: SharedValue<SkPicture>;
   readonly front: SharedValue<SkPicture>;
-  /** Giro del dibujo (radianes): 0 de pie, π volteado. */
+  /** Giro de TODO el dibujo (radianes): 0 de pie, π con el móvil volteado. */
   readonly rotation: SharedValue<number>;
+  /** Giro del reloj (sin el fondo) en un cambio de fase: 0 → π. */
+  readonly spin: SharedValue<number>;
 }
+
+/** Duración del giro en un cambio de fase (ms). */
+export const TURN_MS = 950;
 
 /** Pasos de simulación por fotograma (más = arena más "viva", más CPU). */
 const STEPS_PER_FRAME = 2;
@@ -81,17 +98,22 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
   const [emptyPicture] = useState(recordEmptyPicture);
   // Granos sueltos del chorro: capacidad fija, se crean una sola vez.
   const [particles] = useState(() => new StreamParticles({ capacity: 360, seed: 7 }));
+  const background = useSharedValue<SkPicture>(emptyPicture);
+  const shadow = useSharedValue<SkPicture>(emptyPicture);
+  const body = useSharedValue<SkPicture>(emptyPicture);
   const sand = useSharedValue<SkPicture>(emptyPicture);
-  const back = useSharedValue<SkPicture>(emptyPicture);
   const front = useSharedValue<SkPicture>(emptyPicture);
   const rotation = useSharedValue(motion.flipped ? Math.PI : 0);
+  const spin = useSharedValue(0);
   const slots = useMemo(
     () => ({
+      background: new PictureSlot(background, emptyPicture),
+      shadow: new PictureSlot(shadow, emptyPicture),
+      body: new PictureSlot(body, emptyPicture),
       sand: new PictureSlot(sand, emptyPicture),
-      back: new PictureSlot(back, emptyPicture),
       front: new PictureSlot(front, emptyPicture),
     }),
-    [sand, back, front, emptyPicture],
+    [background, shadow, body, sand, front, emptyPicture],
   );
 
   // Guardamos los parámetros más recientes en una ref para que el bucle
@@ -118,6 +140,10 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
     runInitial: 0,
     /** Volteos ya aplicados a la arena. */
     flips: motion.flips,
+    /** Cambios de fase ya vistos (null = aún no sabemos cuántos había). */
+    turns: null as number | null,
+    /** Inicio (performance.now) del giro de cambio de fase en curso, o null. */
+    turnStart: null as number | null,
     streamShown: false,
     /** Capas del vidrio: con qué pintor e inclinación se grabaron. */
     glass: null as GlassPainter | null,
@@ -142,6 +168,17 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
     const state = loop.current;
     state.dirty = true;
     if (state.raf !== null || state.failed) return;
+
+    /** Fin del giro: la rejilla da la vuelta y el dibujo vuelve a 0, a la vez. */
+    const finishTurn = (sim: SandSimulation) => {
+      if (state.populated === sim) {
+        sim.rotateHalfTurn();
+        // La nueva fase vacía TODO lo que ahora está arriba (como al voltear).
+        state.runInitial = sim.topCount;
+      }
+      particles.reset(7);
+      spin.value = 0;
+    };
 
     const frame = () => {
       state.raf = null;
@@ -178,6 +215,36 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
         changed = true;
       }
 
+      const now = performance.now();
+
+      // 0b) Cambio de fase (ciclos): empieza el giro animado del reloj.
+      const turns = snap.transitions ?? 0;
+      if (state.turns === null || state.populated !== p.sim) {
+        state.turns = turns; // primera foto o simulación nueva: nada que girar
+      } else if (turns !== state.turns) {
+        state.turns = turns;
+        if (p.reduceMotion) {
+          // Sin animación: la arena da la vuelta en el acto.
+          finishTurn(p.sim);
+        } else if (state.turnStart === null) {
+          state.turnStart = now;
+          p.onTurnChange?.(true);
+        }
+        changed = true;
+      }
+      const turning = state.turnStart !== null;
+      if (turning) {
+        const t = Math.min(1, (now - (state.turnStart as number)) / TURN_MS);
+        if (t < 1) {
+          spin.value = Math.PI * easeInOutCubic(t);
+        } else {
+          finishTurn(p.sim);
+          state.turnStart = null;
+          p.onTurnChange?.(false);
+        }
+        changed = true;
+      }
+
       // 1-2) Sincronizar la arena con el tiempo restante.
       if (state.populated !== p.sim) {
         // Simulación nueva (cambio de tamaño, Fast Refresh, remontaje tras
@@ -194,7 +261,8 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
         particles.reset(7);
         changed = true;
       }
-      if (snap.status !== 'idle') {
+      // (Durante el giro no: la arena va quieta dentro del vidrio.)
+      if (snap.status !== 'idle' && state.turnStart === null) {
         const target = targetSourceGrains(state.runInitial, snap.remainingMs, snap.durationMs);
         if (syncSandToTarget(p.sim, target, gs, { maxPerFrame: 8 }) !== 'idle') changed = true;
       }
@@ -207,11 +275,11 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
       // 3b) Granos sueltos del chorro. Siguen cayendo aunque el flujo se
       //     corte: así el chorro termina con los últimos granos.
       const streaming =
+        state.turnStart === null &&
         snap.status === 'running' &&
         snap.remainingMs > 0 &&
         gs.y >= MIN_FLOW_GRAVITY_Y &&
         p.sim.hasGrainAtNeck(gs);
-      const now = performance.now();
       const pin = state.particleInput;
       pin.dt = state.lastTime > 0 ? (now - state.lastTime) / 1000 : 1 / 60;
       state.lastTime = now;
@@ -228,7 +296,9 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
         Math.abs(t.x - state.lightX) > LIGHT_EPSILON ||
         Math.abs(t.y - state.lightY) > LIGHT_EPSILON
       ) {
-        slots.back.publish(p.glass.recordBack(t));
+        slots.background.publish(p.glass.recordBackground(t));
+        slots.shadow.publish(p.glass.recordShadow(t));
+        slots.body.publish(p.glass.recordBody(t));
         slots.front.publish(p.glass.recordFront(t));
         state.glass = p.glass;
         state.lightX = t.x;
@@ -247,12 +317,13 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
       }
 
       // ¿Seguimos? Mientras corre el tiempo o la arena se mueve, sí.
-      const keepGoing = snap.status === 'running' || !p.sim.isSettled || state.dirty || particles.active;
+      const keepGoing =
+        snap.status === 'running' || !p.sim.isSettled || state.dirty || particles.active || turning;
       if (keepGoing) state.raf = requestAnimationFrame(frame);
       else state.lastTime = 0;
     };
     state.raf = requestAnimationFrame(frame);
-  }, [live, initialRef, particles, rotation, slots]);
+  }, [live, initialRef, particles, rotation, spin, slots]);
 
   // Al elegir duración (o reiniciar), colocamos la arena directamente.
   useEffect(() => {
@@ -263,8 +334,12 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
     });
     state.populated = sim;
     state.runInitial = initialGrains;
+    // Si estaba dando la vuelta (cambio de fase) y se reinicia, se cancela.
+    if (state.turnStart !== null) live.current.onTurnChange?.(false);
+    state.turnStart = null;
+    spin.set(0);
     wake();
-  }, [sim, status, initialGrains, wake, live]);
+  }, [sim, status, initialGrains, wake, live, spin]);
 
   // Cualquier cambio relevante despierta el bucle.
   useEffect(() => {
@@ -286,13 +361,20 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
       state.raf = null;
       state.dirty = true;
       state.glass = null;
+      slots.background.release();
+      slots.shadow.release();
+      slots.body.release();
       slots.sand.release();
-      slots.back.release();
       slots.front.release();
     };
   }, [slots]);
 
-  return { sand, back, front, rotation };
+  return { background, shadow, body, sand, front, rotation, spin };
+}
+
+/** Curva lento-rápido-lento (como un objeto real que se gira con la mano). */
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
 /** Grosor relativo del chorro: más fino cuanto más largo es el temporizador. */
