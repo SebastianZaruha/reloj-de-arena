@@ -1,6 +1,6 @@
 {
   "name": "@reloj/core",
-  "version": "1.8.2",
+  "version": "1.8.3",
   "private": true,
   "description": "Lógica pura (sin UI) del Reloj de Arena: motor del temporizador, ajustes, catálogos, simulación de arena y persistencia.",
   "license": "MIT",
