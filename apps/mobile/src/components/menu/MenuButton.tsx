@@ -12,6 +12,7 @@ import { MENU_GUARD_SIZE } from '@reloj/core';
 import { Pressable, StyleSheet } from 'react-native';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 
+import { beginPress, mark } from '../../dev/diagnostics';
 import { useT } from '../../i18n/I18n';
 import { useThemedBackground } from './themedStyles';
 
@@ -32,7 +33,14 @@ export function MenuButton({ top, expanded, onPress, opacity, themeProgress }: P
   return (
     <Animated.View style={[styles.wrap, fade]}>
       <Pressable
-        onPress={onPress}
+        // Diagnóstico (1.8.3): cuándo llega el toque, cuándo se suelta y
+        // cuándo se ejecuta el botón. Apagado no hace nada.
+        onPressIn={(e) => beginPress(e.nativeEvent.timestamp)}
+        onPressOut={() => mark('pressOut')}
+        onPress={() => {
+          mark('onPress');
+          onPress();
+        }}
         style={({ pressed }) => [
           styles.button,
           { height: top - 8 + MENU_GUARD_SIZE },

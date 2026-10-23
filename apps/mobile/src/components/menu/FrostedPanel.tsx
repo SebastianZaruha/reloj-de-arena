@@ -26,6 +26,10 @@
  * mismo móvil; lo que lo hacía ir a tirones en la 1.8 era el resto (la
  * pantalla re-renderizándose 4 veces por segundo, las llamadas nativas y los
  * fotogramas encolados), ya arreglado en la 1.8.1.
+ *
+ * Diagnóstico (1.8.3): `mode` permite probar en el móvil otras dos formas
+ * (ver dev/diagnostics.ts): el mismo BackdropBlur montado desde el arranque
+ * (`premounted`) o un panel sin desenfoque, del color del tema (`flat`).
  */
 import {
   BackdropBlur,
@@ -38,7 +42,10 @@ import {
   rrect,
   vec,
 } from '@shopify/react-native-skia';
+import { useLayoutEffect } from 'react';
 import { interpolateColor, useDerivedValue, type SharedValue } from 'react-native-reanimated';
+
+import { mark, type GlassMode } from '../../dev/diagnostics';
 
 import { DARK_THEME, LIGHT_THEME } from '../../theme/theme';
 
@@ -46,6 +53,9 @@ import { DARK_THEME, LIGHT_THEME } from '../../theme/theme';
 export const SHEET_RADIUS = 30;
 /** Desenfoque del vidrio (px). */
 const BLUR = 26;
+/** Panel sin desenfoque (diagnóstico `flat`): el tinte, casi opaco, arriba y abajo. */
+const FLAT_LIGHT = ['rgba(247, 243, 237, 0.94)', 'rgba(238, 232, 224, 0.96)'] as const;
+const FLAT_DARK = ['rgba(44, 37, 31, 0.93)', 'rgba(32, 27, 23, 0.96)'] as const;
 /** Alto de la sombra sobre el canto. */
 const SHADOW_H = 28;
 
@@ -61,9 +71,15 @@ interface Props {
   readonly openness: SharedValue<number>;
   /** 0 = tema claro, 1 = oscuro (animado). */
   readonly themeProgress: SharedValue<number>;
+  /** Forma de dibujar el vidrio (diagnóstico; por defecto, `live`). */
+  readonly mode?: GlassMode;
 }
 
-export function FrostedPanel({ width, height, top, openness, themeProgress }: Props) {
+export function FrostedPanel({ width, height, top, openness, themeProgress, mode = 'live' }: Props) {
+  // Diagnóstico: el vidrio ya está en el lienzo (montado al abrir).
+  useLayoutEffect(() => {
+    if (mode === 'live') mark('panel');
+  }, [mode]);
   // La forma se prolonga por debajo de la pantalla para que las esquinas
   // redondeadas de abajo nunca se vean.
   const shape = useDerivedValue(() =>
@@ -81,6 +97,12 @@ export function FrostedPanel({ width, height, top, openness, themeProgress }: Pr
     interpolateColor(themeProgress.value, [0, 1], [L.panelEdge, D.panelEdge]),
   );
   const scrim = useDerivedValue(() => interpolateColor(themeProgress.value, [0, 1], [L.scrim, D.scrim]));
+  const flatStart = useDerivedValue(() => vec(0, top.value));
+  const flatEnd = useDerivedValue(() => vec(0, height));
+  const flatColors = useDerivedValue(() => [
+    interpolateColor(themeProgress.value, [0, 1], [FLAT_LIGHT[0], FLAT_DARK[0]]),
+    interpolateColor(themeProgress.value, [0, 1], [FLAT_LIGHT[1], FLAT_DARK[1]]),
+  ]);
   const shadowColors = useDerivedValue(() => [
     'rgba(60, 44, 30, 0)',
     interpolateColor(themeProgress.value, [0, 1], ['rgba(60, 44, 30, 0.07)', 'rgba(0, 0, 0, 0.28)']),
@@ -92,9 +114,17 @@ export function FrostedPanel({ width, height, top, openness, themeProgress }: Pr
       <Rect rect={shadowRect}>
         <LinearGradient start={shadowStart} end={shadowEnd} colors={shadowColors} />
       </Rect>
-      <BackdropBlur blur={BLUR} clip={shape}>
-        <Fill color={tint} />
-      </BackdropBlur>
+      {mode === 'flat' ? (
+        <Group clip={shape}>
+          <Fill>
+            <LinearGradient start={flatStart} end={flatEnd} colors={flatColors} />
+          </Fill>
+        </Group>
+      ) : (
+        <BackdropBlur blur={BLUR} clip={shape}>
+          <Fill color={tint} />
+        </BackdropBlur>
+      )}
       <Group clip={edgeBand}>
         <RoundedRect rect={shape} style="stroke" strokeWidth={1} color={edge} />
       </Group>

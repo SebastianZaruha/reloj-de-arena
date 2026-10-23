@@ -74,6 +74,11 @@ export interface SandEngineParams {
   readonly onError: (error: unknown) => void;
   /** Avisa al empezar (true) y al acabar (false) el giro de cambio de fase. */
   readonly onTurnChange?: (turning: boolean) => void;
+  /**
+   * Arena congelada (diagnóstico 1.8.3): el bucle no hace nada mientras es
+   * true. Al volver a false, la arena se pone al día con el tiempo restante.
+   */
+  readonly frozen?: boolean;
 }
 
 export interface SandEngineOutput {
@@ -224,6 +229,11 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
 
     const runFrame = () => {
       const p = live.current;
+      if (p.frozen) {
+        // Se despierta al descongelar (efecto de abajo).
+        state.lastTime = 0;
+        return;
+      }
       const m = p.motion;
       const g = m.gravity; // suave: chorro y dibujo
       const gs = m.simGravity; // en escalones: simulación
@@ -399,7 +409,7 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
   // Cualquier cambio relevante despierta el bucle.
   useEffect(() => {
     wake();
-  }, [status, params.painter, params.glass, params.reduceMotion, wake]);
+  }, [status, params.painter, params.glass, params.reduceMotion, params.frozen, wake]);
 
   // La fuente de movimiento (acelerómetro) también lo despierta.
   useEffect(() => motion.subscribe(wake), [motion, wake]);

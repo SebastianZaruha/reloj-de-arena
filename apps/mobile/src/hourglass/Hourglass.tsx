@@ -102,6 +102,8 @@ export interface HourglassProps {
    * Giran con el móvil volteado, pero no se desenfocan en la pausa.
    */
   readonly children?: ReactNode;
+  /** Arena congelada (solo para el diagnóstico 1.8.3, ver useSandEngine). */
+  readonly frozen?: boolean;
 }
 
 function HourglassComponent(props: HourglassProps) {
@@ -129,6 +131,7 @@ function HourglassCanvas({
   pose,
   poseActive = false,
   children,
+  frozen = false,
 }: HourglassProps) {
   // Si el bucle de dibujo falla (fuera del render), lo relanzamos DENTRO del
   // render para que lo capture el error boundary que nos envuelve.
@@ -181,6 +184,7 @@ function HourglassCanvas({
     reduceMotion,
     onError,
     onTurnChange: setTurning,
+    frozen,
   });
 
   // Giro de 180° al voltear, alrededor del centro de la pantalla.

@@ -28,7 +28,7 @@ import {
   type Settings,
   type ThemePreference,
 } from '@reloj/core';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
 import {
   AccessibilityInfo,
   BackHandler,
@@ -39,10 +39,17 @@ import {
   View,
 } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
-import Animated, { Easing, useAnimatedStyle, withTiming, type SharedValue } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  withTiming,
+  type AnimatedRef,
+  type SharedValue,
+} from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import type { AlertsNotice } from '../../background/useBackgroundTimer';
+import { clearHistory, mark, setDiagnostics, useDiagnostics, type GlassMode } from '../../dev/diagnostics';
 import { useT } from '../../i18n/I18n';
 import type { HourglassTheme } from '../../theme/theme';
 import { Chip, Segmented, Stepper, ToggleRow, type SegmentOption } from './controls';
@@ -68,6 +75,13 @@ const languageOptions = (t: Messages): readonly SegmentOption<LanguagePreference
 const modeOptions = (t: Messages): readonly SegmentOption<SessionMode>[] => [
   { value: 'single', label: t.single },
   { value: 'cycles', label: t.cycles },
+];
+
+/** Diagnóstico (1.8.3, oculto): solo en español, es para pruebas. */
+const GLASS_OPTIONS: readonly SegmentOption<GlassMode>[] = [
+  { value: 'live', label: 'Al abrir' },
+  { value: 'premounted', label: 'Premontado' },
+  { value: 'flat', label: 'Sin desenfoque' },
 ];
 
 /** Opacidad de la sección que no está en uso (Tiempos rápidos o Ciclos). */
@@ -100,6 +114,10 @@ interface Props {
     readonly onChange: (on: boolean) => void;
     readonly notice: AlertsNotice | null;
   } | null;
+  /** ¿Está encendido el lector de pantalla? (para el aviso al abrir) */
+  readonly screenReader?: boolean;
+  /** Referencia a la vista de la hoja (la mide el diagnóstico). */
+  readonly viewRef?: AnimatedRef<Animated.View>;
 }
 
 export function SettingsSheet({
@@ -115,11 +133,19 @@ export function SettingsSheet({
   onShowGestures,
   alertsNotice = null,
   floating = null,
+  screenReader = false,
+  viewRef,
 }: Props) {
   const t = useT();
   const s = useMenuStyles(themeProgress);
   const base = { styles: s, fonts, pillShadow: theme.ui.pillShadow };
   const { open, visible, hide, offset, height } = sheet;
+  const diag = useDiagnostics();
+
+  // Diagnóstico: primer render de la hoja abierta ya aplicado.
+  useLayoutEffect(() => {
+    if (open) mark('commit');
+  }, [open]);
 
   // ─── Alto: el del contenido, sin pasar de casi toda la pantalla ─────────
   const maxHeight = screenHeight - safeTop - 56;
@@ -141,7 +167,9 @@ export function SettingsSheet({
   // ─── Atrás de Android ───────────────────────────────────────────────────
   useEffect(() => {
     if (!open) return;
-    AccessibilityInfo.announceForAccessibility(t.settings);
+    // Solo con el lector de pantalla encendido (1.8.3): sin él, el aviso no
+    // sirve de nada y en Android pasa por el sistema de accesibilidad.
+    if (screenReader) AccessibilityInfo.announceForAccessibility(t.settings);
     if (Platform.OS === 'web') {
       // En la web no hay botón «atrás» del sistema: usamos la tecla Escape.
       const onKey = (e: KeyboardEvent) => {
@@ -198,6 +226,7 @@ export function SettingsSheet({
 
   return (
     <Animated.View
+      ref={viewRef}
       style={[styles.sheet, { height: sheetHeight || undefined }, slide]}
       pointerEvents={open ? 'auto' : 'none'}
       accessibilityViewIsModal={open}
@@ -219,12 +248,20 @@ export function SettingsSheet({
           {/* Título con el resumen debajo; a la derecha, el «?» de los gestos. */}
           <View style={styles.headRow}>
             <View style={styles.headText}>
-              <Animated.Text
-                style={[styles.title, { fontFamily: fonts.medium }, s.ink]}
-                accessibilityRole="header"
+              {/* Pulsación larga: enciende o apaga el diagnóstico (1.8.3, oculto). */}
+              <Pressable
+                onLongPress={() => setDiagnostics({ enabled: !diag.enabled })}
+                delayLongPress={1200}
+                accessible={false}
+                testID="titulo-ajustes"
               >
-                {t.settings}
-              </Animated.Text>
+                <Animated.Text
+                  style={[styles.title, { fontFamily: fonts.medium }, s.ink]}
+                  accessibilityRole="header"
+                >
+                  {t.settings}
+                </Animated.Text>
+              </Pressable>
               <Animated.Text
                 style={[styles.summary, { fontFamily: fonts.regular }, s.inkSoft]}
                 numberOfLines={1}
@@ -424,6 +461,45 @@ export function SettingsSheet({
                 </Pressable>
               ) : null,
             )}
+            {diag.enabled ? (
+              <View style={styles.diag} testID="seccion-diagnostico">
+                <Animated.View style={[styles.hline, s.lineBg]} />
+                <Section label="Diagnóstico · vidrio" styles={s} fonts={fonts}>
+                  <Segmented
+                    {...base}
+                    options={GLASS_OPTIONS}
+                    value={diag.glass}
+                    onChange={(glass) => setDiagnostics({ glass })}
+                    accessibilityLabel="Vidrio"
+                    testID="diag-vidrio"
+                  />
+                </Section>
+                <ToggleRow
+                  {...base}
+                  label="Hoja sin animación"
+                  value={diag.noAnimation}
+                  onChange={(noAnimation) => setDiagnostics({ noAnimation })}
+                  testID="diag-sin-animacion"
+                />
+                <ToggleRow
+                  {...base}
+                  label="Arena quieta con el menú"
+                  value={diag.freezeSand}
+                  onChange={(freezeSand) => setDiagnostics({ freezeSand })}
+                  testID="diag-arena"
+                />
+                <Pressable
+                  onPress={clearHistory}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [styles.notice, pressed && styles.helpPressed]}
+                  testID="diag-borrar"
+                >
+                  <Animated.Text style={[styles.noticeText, { fontFamily: fonts.medium }, s.inkSoft]}>
+                    Borrar mediciones
+                  </Animated.Text>
+                </Pressable>
+              </View>
+            ) : null}
           </View>
         </ScrollView>
       </GestureDetector>
@@ -519,5 +595,6 @@ const styles = StyleSheet.create({
   toggle: { flex: 1 },
   toggleDivider: { width: StyleSheet.hairlineWidth, height: 26, marginHorizontal: 20 },
   notice: { minHeight: 44, justifyContent: 'center', marginTop: 4 },
+  diag: { marginTop: 10 },
   noticeText: { fontSize: 12, textAlign: 'center', letterSpacing: 0.2, textDecorationLine: 'underline' },
 });

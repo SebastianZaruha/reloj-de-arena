@@ -19,6 +19,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 
 import { BackgroundTimer } from '../../modules/background-timer';
+import { countNative } from '../dev/diagnostics';
 import type { AlertsNotice } from './useBackgroundTimer';
 import { readPermissions } from './useBackgroundTimer';
 
@@ -50,6 +51,7 @@ const DEV_PIP =
 
 function inPictureInPicture(): boolean {
   try {
+    countNative('isInPictureInPicture');
     return BackgroundTimer?.isInPictureInPicture() ?? false;
   } catch {
     return false;

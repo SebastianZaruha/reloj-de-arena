@@ -25,6 +25,7 @@ import {
 } from '@reloj/core';
 
 import { BackgroundTimer } from '../../modules/background-timer';
+import { countNative } from '../dev/diagnostics';
 
 export const backgroundAvailable = BackgroundTimer !== null;
 
@@ -41,6 +42,7 @@ interface NativeState {
 function readNative(): NativeState | null {
   if (!BackgroundTimer) return null;
   try {
+    countNative('getState');
     const raw = BackgroundTimer.getState();
     if (!raw) return null;
     const r = JSON.parse(raw) as { session?: unknown; seq?: unknown };
@@ -109,6 +111,7 @@ export function syncBackground(
   );
   if (json === lastSent && !options.force) return true;
   try {
+    countNative('sync');
     const accepted = BackgroundTimer.sync(json);
     lastSent = accepted ? json : null;
     return accepted;

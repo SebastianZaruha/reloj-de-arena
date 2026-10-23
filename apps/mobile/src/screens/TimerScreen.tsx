@@ -75,6 +75,7 @@ import {
   type GestureTouchEvent,
 } from 'react-native-gesture-handler';
 import Animated, {
+  useAnimatedRef,
   useAnimatedStyle,
   useDerivedValue,
   useReducedMotion,
@@ -97,6 +98,8 @@ import { useSheet } from '../components/menu/useSheet';
 import { PauseLabel } from '../components/PauseLabel';
 import { TIME_LINE_HEIGHT, TimeDisplay } from '../components/TimeDisplay';
 import { appClock } from '../dev/devClock';
+import { DiagnosticsOverlay } from '../dev/DiagnosticsOverlay';
+import { mark, useDiagnostics } from '../dev/diagnostics';
 import { playSelectionTick, playTimerHaptic, useTimerHaptics } from '../haptics';
 import { Hourglass, type PauseBlur } from '../hourglass';
 import { useKeepAwakeWhile } from '../hooks/useKeepAwakeWhile';
@@ -217,7 +220,12 @@ export function TimerScreen({ settings, fonts }: Props) {
 
   // ─── Introducción (solo al abrir en frío) y hoja de ajustes ─────────────
   const intro = useIntro(reduceMotion);
-  const sheet = useSheet(height, reduceMotion);
+  // Diagnóstico oculto (1.8.3): modos de prueba del menú (ver dev/diagnostics.ts).
+  const diag = useDiagnostics();
+  const sheet = useSheet(height, reduceMotion || diag.noAnimation);
+  const sheetRef = useAnimatedRef<Animated.View>();
+  // Diagnóstico: empieza el render con la hoja abierta (solo cuenta el primero).
+  if (sheet.open) mark('render');
   // Con la ayuda de gestos abierta, el tiempo y el botón del menú se apagan.
   const helpFade = useSharedValue(0);
   const timeOpacity = useDerivedValue(
@@ -445,19 +453,22 @@ export function TimerScreen({ settings, fonts }: Props) {
   // render de la pantalla sería un hijo «nuevo» y el lienzo Skia entero se
   // volvería a reconciliar aunque no cambie nada.
   // Solo se monta mientras la hoja se ve (como en la 1.6): un BackdropBlur
-  // montado cuesta en cada fotograma aunque esté fuera de la pantalla.
+  // montado cuesta en cada fotograma aunque esté fuera de la pantalla. (El
+  // modo de diagnóstico `premounted` lo deja montado desde el arranque.)
+  const glassMode = diag.glass;
   const frosted = useMemo(
     () =>
-      sheet.visible ? (
+      sheet.visible || glassMode === 'premounted' ? (
         <FrostedPanel
           width={width}
           height={height}
           top={sheet.top}
           openness={sheet.openness}
           themeProgress={themeProgress}
+          mode={glassMode}
         />
       ) : null,
-    [sheet.visible, sheet.top, sheet.openness, width, height, themeProgress],
+    [sheet.visible, sheet.top, sheet.openness, width, height, themeProgress, glassMode],
   );
   // En imagen en imagen no hay textos ni menú: el reloj ocupa toda la ventanita.
   const insets = useMemo(
@@ -511,6 +522,7 @@ export function TimerScreen({ settings, fonts }: Props) {
               reduceMotion={reduceMotion}
               pose={intro.pose}
               poseActive={intro.active}
+              frozen={diag.freezeSand && sheet.visible}
             >
               {frosted}
             </Hourglass>
@@ -570,6 +582,8 @@ export function TimerScreen({ settings, fonts }: Props) {
             safeTop={tilt.flipped ? safe.bottom : safe.top}
             safeBottom={tilt.flipped ? safe.top : safe.bottom}
             onShowGestures={showGestures}
+            screenReader={screenReader}
+            viewRef={sheetRef}
             alertsNotice={alertsNotice}
             floating={
               floating.available
@@ -607,6 +621,14 @@ export function TimerScreen({ settings, fonts }: Props) {
           />
         </View>
       )}
+      {diag.enabled && !pip ? (
+        <DiagnosticsOverlay
+          openness={sheet.openness}
+          top={safe.top + 4}
+          sheetRef={sheetRef}
+          screenHeight={height}
+        />
+      ) : null}
     </View>
   );
 }

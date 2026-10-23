@@ -24,6 +24,11 @@ import {
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { mark } from '../../dev/diagnostics';
+
+/** Fin de la animación de abrir (diagnóstico): la hora se toma en el hilo de la interfaz. */
+const markOpened = (at: number) => mark('animEnd', at);
+
 export const SHEET_OPEN_MS = 340;
 export const SHEET_CLOSE_MS = 260;
 
@@ -64,12 +69,17 @@ export function useSheet(screenHeight: number, reduceMotion: boolean): SheetStat
   const show = useCallback(() => {
     // Ya abierta o abriéndose: nada que hacer.
     if (!gate.show(Date.now(), reduceMotion ? 0 : SHEET_OPEN_MS)) return;
+    mark('show');
     setVisible(true);
     setOpen(true);
     // Si estaba escondida del todo, empieza justo por debajo del borde.
     if (offset.get() > height.get()) offset.set(height.get());
+    const opened = (finished?: boolean) => {
+      'worklet';
+      if (finished) scheduleOnRN(markOpened, Date.now());
+    };
     offset.set(
-      reduceMotion ? 0 : withTiming(0, { duration: SHEET_OPEN_MS, easing: Easing.out(Easing.cubic) }),
+      reduceMotion ? 0 : withTiming(0, { duration: SHEET_OPEN_MS, easing: Easing.out(Easing.cubic) }, opened),
     );
   }, [gate, offset, height, reduceMotion]);
 

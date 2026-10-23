@@ -15,6 +15,7 @@ import { useEffect, useState } from 'react';
 import { Alert, AppState, PermissionsAndroid, Platform } from 'react-native';
 
 import { BackgroundTimer, type BackgroundPermissions } from '../../modules/background-timer';
+import { countNative } from '../dev/diagnostics';
 import { appClock } from '../dev/devClock';
 import type { UseSession } from '../hooks/useSession';
 import { useLatest } from '../hooks/useLatest';
@@ -35,6 +36,7 @@ const NEEDS_RUNTIME_PERMISSION = Platform.OS === 'android' && Number(Platform.Ve
 
 export function readPermissions(): BackgroundPermissions {
   try {
+    countNative('getPermissions');
     return BackgroundTimer?.getPermissions() ?? ALL_GRANTED;
   } catch {
     return ALL_GRANTED;
@@ -113,8 +115,10 @@ export function useBackgroundTimer({ session, settings, update, tr }: Options): 
     });
     // A la vista o no: decide quién avisa, la app o la notificación. Al volver,
     // nos ponemos al día, releemos los permisos y repintamos la notificación.
+    countNative('setForeground');
     native.setForeground(AppState.currentState !== 'background');
     const visibility = AppState.addEventListener('change', (state) => {
+      countNative('setForeground');
       native.setForeground(state === 'active');
       if (state !== 'active') return;
       actions.catchUp();
