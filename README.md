@@ -48,7 +48,8 @@ un fondo cálido y difuso. Todo se maneja con gestos; los ajustes viven en un me
 | **Voltear** (180°)          | Como uno real: empieza de cero y cae la arena del otro lado.            |
 
 Además, el menú tiene tema claro, oscuro o automático, español e inglés, tiempos rápidos, ciclos
-de trabajo y descanso, y sonido y vibración. La pantalla **«Gestos»** explica todo lo anterior:
+de trabajo y descanso, sonido y vibración y, en Android, una ventana flotante con el reloj encima
+de otras apps. La pantalla **«Gestos»** explica todo lo anterior:
 sale sola la primera vez y se abre con el «?» del menú.
 
 ## Tecnología y por qué
@@ -59,7 +60,7 @@ sale sola la primera vez y se abre con el «?» del menú.
 | **@shopify/react-native-skia** (shaders SkSL)    | Dibujo por GPU con shaders: vidrio y arena realistas a 60 fps. En web usa **CanvasKit** (Skia en WebAssembly).                                 |
 | **Reanimated 4 + Gesture Handler 3**             | La arena se publica en _shared values_: el lienzo se redibuja sin re-renderizar React. Gestos nativos fluidos.                                 |
 | **expo-sensors · expo-haptics · expo-audio**     | Acelerómetro (inclinación, pausa, volteo), vibración y sonido.                                                                                 |
-| **Módulo local de Expo en Kotlin** (1.7)         | Notificación con cuenta atrás nativa y avisos con la app cerrada (alarmas exactas). Ver [docs/SEGUNDO_PLANO.md](docs/SEGUNDO_PLANO.md).        |
+| **Módulo local de Expo en Kotlin** (1.7)         | Notificación con cuenta atrás, avisos con la app cerrada y ventana flotante (1.8). Ver [docs/SEGUNDO_PLANO.md](docs/SEGUNDO_PLANO.md).         |
 | **Núcleo en TypeScript puro** (`@reloj/core`)    | Temporizador, simulación, física y ajustes sin React ni UI: se prueba con **Vitest** en milisegundos y se reutilizará en la app de escritorio. |
 | **npm workspaces** (monorepo)                    | Funciona sin configuración extra con Metro/Expo en Windows.                                                                                    |
 | **ESLint + Prettier + TypeScript estricto**      | Un solo comando (`npm run check`) valida tipos, estilo, formato y tests.                                                                       |
@@ -200,15 +201,15 @@ npm test             # solo los tests (Vitest, paquete core)
 npm run test:coverage
 ```
 
-El núcleo (`packages/core`) tiene **182 tests** en 21 archivos: temporizador (incluidos casos
+El núcleo (`packages/core`) tiene **184 tests** en 21 archivos: temporizador (incluidos casos
 extremos del final de la cuenta y entradas NaN/Infinity), duraciones, avisos, vibración,
 ajustes (y su migración), ciclos y motor de sesiones (fases encadenadas sin perder ni un
 milisegundo, pausa, volteo, guardado), geometría y zona del botón del menú, simulación de
 arena (avalanchas, volteo, aterrizaje, vaciado en embudo, flujo tras dar la vuelta), chorro de
 granos a cualquier fps, textos en español e inglés (mismas claves), filtro del acelerómetro y
 máquina de estados de pausa/volteo, y los avisos en segundo plano (alarmas, pausar/reanudar/
-reiniciar desde la notificación, igual que el motor de sesiones). El módulo Kotlin tiene 8 tests
-JUnit propios (`cd apps/mobile/android && ./gradlew :background-timer:testDebugUnitTest`).
+reiniciar desde la notificación, igual que el motor de sesiones). El módulo Kotlin tiene 31 tests
+JUnit propios (incluida la ventana flotante y su dibujo con Robolectric) (`cd apps/mobile/android && ./gradlew :background-timer:testDebugUnitTest`).
 La app se comprueba con tipos, ESLint (incluido React Compiler), pruebas de extremo a extremo
 en la web con Playwright y pruebas manuales en Android (ver [CHANGELOG](CHANGELOG.md)).
 

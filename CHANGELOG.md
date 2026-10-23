@@ -9,6 +9,62 @@ funcionamiento interno en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md).
 > APK de desarrollo. A partir de la publicación en GitHub basta con `git pull`; las
 > instrucciones «Cómo actualizar» se conservan como referencia.
 
+## 1.8.0 — Ventana flotante e imagen en imagen (Android)
+
+Segunda parte de la fase 4: con **«Ventana flotante»** activada en el menú, al salir de la app
+con un reloj en marcha el reloj de arena se queda **encima de las demás apps**: solo el vidrio
+y la arena, pequeño y sin fondo. Se arrastra, se pellizca para cambiar de tamaño y se quita
+llevándolo a la × de abajo. Sin permiso, la app pasa a **imagen en imagen**. Cómo está hecho,
+en [docs/SEGUNDO_PLANO.md](docs/SEGUNDO_PLANO.md#ventana-flotante-18). **Hay código nativo
+nuevo: hace falta APK nuevo.**
+
+### Cómo actualizar desde la 1.7
+
+1. `git pull`. **No hace falta `npm install`** (sin dependencias nuevas de la app; los tests
+   Kotlin añaden Robolectric, que Gradle descarga solo).
+2. **APK nuevo:** `cd apps/mobile`, `npx expo prebuild --platform android --clean` (añade el
+   permiso `SYSTEM_ALERT_WINDOW` y la imagen en imagen a la actividad) y compílalo como siempre.
+3. Instálalo y abre la app. Tus ajustes se migran solos (versión 5; la ventana flotante empieza
+   apagada).
+4. **En el móvil:**
+   - Menú → **Ventana flotante**. La primera vez sale una explicación; **Dar permiso** abre
+     «Mostrar sobre otras apps»: actívalo para el Reloj de Arena y vuelve.
+   - Xiaomi/HyperOS: en los permisos de la app, permite también **«Mostrar ventanas emergentes
+     mientras se ejecuta en segundo plano»** (y, como en la 1.7, inicio automático y batería
+     sin restricciones).
+   - Sin el permiso, al ir a inicio con el reloj en marcha verás la app en imagen en imagen.
+
+### Novedades
+
+| Qué              | Cómo                                                                                                                                       | Dónde                                    |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
+| Ventana flotante | Vista nativa con `Canvas` (sin JS): silueta del modelo Clásico, arena con la paleta de la app, embudo, montón y un chorro fino a ~12 fps.  | `HourglassView.kt`, `HourglassShape.kt`  |
+| Arena de verdad  | El nivel sale del tiempo que queda en el estado nativo; al cambiar de fase da la vuelta y se rellena. En pausa se atenúa y no se redibuja. | `FloatingWindow.kt`                      |
+| Gestos           | Arrastrar (se acomoda en el borde), pellizcar (44–124 dp), tocar abre la app, mantener pausa/reanuda, a la × para quitarla. Con TalkBack.  | `FloatingWindow.kt`, `FloatingGeometry`  |
+| Cuándo se ve     | En segundo plano con un reloj en marcha; se oculta al volver o al terminar. Funciona también con la app muerta (alarmas, botones).         | `FloatingPolicy.kt`, `AppVisibility.kt`  |
+| Explicación      | Pantalla como «Gestos» (vidrio desenfocado, letra grande y ligera, es/en) antes de pedir «Mostrar sobre otras apps».                       | `FloatingHelp.tsx`, `InfoScreen.tsx`     |
+| Imagen en imagen | Sin permiso: al salir, PiP con solo el reloj (sin tiempo ni menú). Android 12+ entra solo; 8–11 al pulsar inicio.                          | `PictureInPicture.kt`, `TimerScreen.tsx` |
+| Temas            | Claro, oscuro o el del sistema, igual que el menú.                                                                                         | `HourglassPalette`                       |
+
+### Decisiones tomadas (se pueden cambiar)
+
+- **Tamaño con pellizco** (continuo, sin presets en el menú) para no añadir más opciones.
+- **Quitarla con la ×** no apaga el interruptor: vuelve la próxima vez que salgas de la app.
+- **Si sales con el reloj en pausa** no aparece; si ya se veía y la pausas, se queda atenuada.
+- **Sin servicio en primer plano:** una ventana visible ya da prioridad al proceso.
+- **Imagen en imagen** se queda con el reloj vacío al terminar (no se cierra sola).
+
+### Pruebas
+
+- Core: **184 tests** en 21 archivos (ajustes versión 5 y datos de la ventana en el payload).
+- Módulo Kotlin: **31 tests** (antes 8): geometría (bordes, tamaño, la ×), política de
+  mostrar/ocultar, perfil y niveles de arena, y el dibujo de la vista con Robolectric (arena,
+  chorro, temas, pausa), que también puede guardar capturas en PNG.
+- `npm run check` limpio; ciclo completo en la web sin errores (allí no hay ventana flotante).
+- APK de desarrollo arm64 (versión 1.8.0) con el permiso y la imagen en imagen comprobados.
+  **Falta probarlo en el móvil**: no se pudo arrancar un emulador; las capturas de la ventana
+  sobre otra app son del test de dibujo.
+
 ## 1.7.0 — Notificación y avisos con la app cerrada (Android)
 
 Primera parte de la fase 4: en Android el reloj **sigue contando en segundo plano y con la app

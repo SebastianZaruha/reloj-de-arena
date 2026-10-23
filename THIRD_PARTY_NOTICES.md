@@ -44,6 +44,8 @@ licencia; para una versión publicada (Google Play) conviene mostrarlos en una p
 | vitest, @vitest/coverage-v8                                           | MIT        |
 | eslint, typescript-eslint, eslint-config-expo, eslint-config-prettier | MIT        |
 | prettier                                                              | MIT        |
+| junit (tests Kotlin)                                                  | EPL-1.0    |
+| robolectric (tests Kotlin del dibujo)                                 | MIT        |
 
 ## Recursos
 

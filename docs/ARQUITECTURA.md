@@ -63,14 +63,14 @@ reloj-de-arena/
 │       │   ├── sim/        ← simulación granular de la arena + controlador de flujo
 │       │   ├── persistence/← interfaces de almacenamiento + implementación local
 │       │   └── background/ ← sesión mínima para Android, avisos futuros y textos de la notificación
-│       └── test/           ← tests de Vitest (182 tests)
+│       └── test/           ← tests de Vitest (184 tests)
 │
 └── apps/
     └── mobile/             ← @reloj/mobile: la app Expo / React Native
         ├── index.ts        ← entrada de Expo → src/bootstrap(.web).ts
         ├── app.json        ← configuración de Expo (nombre, paquete Android, tema, web…)
         ├── assets/sounds/  ← fin.mp3 (aviso al terminar) y cambio.mp3 (cambio de fase)
-        ├── modules/background-timer/ ← MÓDULO NATIVO PROPIO (Kotlin): notificación, alarmas, botones
+        ├── modules/background-timer/ ← MÓDULO NATIVO PROPIO (Kotlin): notificación, alarmas, botones, ventana flotante y PiP
         ├── public/         ← canvaskit.wasm para la web (lo copia npm install; no se versiona)
         └── src/
             ├── App.tsx             ← proveedores (gestos, safe area), fuentes, ajustes y fondo según el tema
@@ -94,8 +94,9 @@ reloj-de-arena/
             ├── motion/             ← acelerómetro (expo-sensors) → LiveMotion; simulador web
             ├── components/PauseLabel.tsx ← rótulo «Pausa» (al tumbar el móvil o al tocar)
             ├── components/GesturesHelp.tsx ← pantalla de ayuda «Gestos» (sección 14)
+            ├── components/FloatingHelp.tsx ← explicación de la ventana flotante (mismo marco: InfoScreen.tsx)
             ├── i18n/I18n.tsx       ← idioma de la app: proveedor y useT() (sección 13)
-            ├── background/         ← enlace con el módulo nativo: useBackgroundTimer, sync, ¿avisa la app?
+            ├── background/         ← enlace con el módulo nativo: useBackgroundTimer, useFloatingWindow, sync, ¿avisa la app?
             ├── recovery/           ← guardar/recuperar la cuenta si hay que recargar (web)
             ├── storage/            ← adaptador AsyncStorage → interfaz del core
             ├── theme/theme.ts      ← paletas clara y oscura (también las del menú) y resolveScheme
@@ -467,8 +468,13 @@ como alarmas exactas y pinta el cronómetro nativo. `useBackgroundTimer` envía 
 la sesión y, al volver, adopta lo que se haya hecho desde la notificación (número de
 secuencia `seq`). Mientras la app está a la vista, avisa la app y la notificación calla.
 
-Todo el detalle (por qué no `expo-notifications`, canales, permisos, límites) está en
-[SEGUNDO_PLANO.md](SEGUNDO_PLANO.md).
+Desde la 1.8, con «Ventana flotante» activada, el reloj de arena se queda encima de las demás
+apps: una vista nativa (`HourglassView.kt`, `Canvas`) en una ventana superpuesta que lee el
+mismo estado nativo, así que no necesita JavaScript. Sin el permiso «Mostrar sobre otras apps»
+la app entra en imagen en imagen con solo el reloj (`useFloatingWindow`).
+
+Todo el detalle (por qué no `expo-notifications`, canales, permisos, la ventana flotante, sus
+gestos y límites) está en [SEGUNDO_PLANO.md](SEGUNDO_PLANO.md).
 
 ## Simulador de inclinación en el navegador
 

@@ -1,4 +1,4 @@
-# Segundo plano en Android: notificación y avisos
+# Segundo plano en Android: notificación, avisos y ventana flotante
 
 Desde la 1.7, en Android el reloj **sigue contando con la app en segundo plano o cerrada**:
 
@@ -6,6 +6,8 @@ Desde la 1.7, en Android el reloj **sigue contando con la app en segundo plano o
   tiempo que queda corriendo solo) con los botones **Pausar / Reanudar** y **Reiniciar**.
 - Al **cambiar de fase** y al **terminar** suena el aviso (`cambio.mp3` / `fin.mp3`) y vibra
   igual que dentro de la app (doble toque en el cambio de fase), aunque la app esté cerrada.
+- Desde la 1.8, una **ventana flotante** opcional deja el reloj de arena, pequeño y sin
+  fondo, encima de las demás apps. Sin permiso, la app pasa a **imagen en imagen** (PiP).
 
 Este documento explica cómo está hecho y por qué. El resto de la arquitectura está en
 [ARQUITECTURA.md](ARQUITECTURA.md).
@@ -86,12 +88,13 @@ sonido o un patrón, sube `CHANNEL_VERSION` en `TimerNotifications.kt` (crea can
 
 ## Permisos
 
-| Permiso                  | Cuándo                                                                                         |
-| ------------------------ | ---------------------------------------------------------------------------------------------- |
-| `POST_NOTIFICATIONS`     | Android 13+. Se pide **una vez**, la primera vez que empieza un reloj, tras explicar para qué. |
-| `USE_EXACT_ALARM`        | Android 13+. Se concede solo (es para apps de temporizador).                                   |
-| `SCHEDULE_EXACT_ALARM`   | Solo Android 12. Viene concedido, pero se puede quitar en Ajustes → «Alarmas y recordatorios». |
-| `RECEIVE_BOOT_COMPLETED` | Reprogramar los avisos tras reiniciar el móvil.                                                |
+| Permiso                  | Cuándo                                                                                          |
+| ------------------------ | ----------------------------------------------------------------------------------------------- |
+| `POST_NOTIFICATIONS`     | Android 13+. Se pide **una vez**, la primera vez que empieza un reloj, tras explicar para qué.  |
+| `USE_EXACT_ALARM`        | Android 13+. Se concede solo (es para apps de temporizador).                                    |
+| `SCHEDULE_EXACT_ALARM`   | Solo Android 12. Viene concedido, pero se puede quitar en Ajustes → «Alarmas y recordatorios».  |
+| `RECEIVE_BOOT_COMPLETED` | Reprogramar los avisos tras reiniciar el móvil.                                                 |
+| `SYSTEM_ALERT_WINDOW`    | 1.8, solo con «Ventana flotante» activada. Lo concede el usuario en «Mostrar sobre otras apps». |
 
 Si falta un permiso, el menú muestra un aviso que abre los ajustes del sistema. Rechazarlo no
 rompe nada: el reloj sigue funcionando con la app abierta, como antes.
@@ -106,11 +109,85 @@ rompe nada: el reloj sigue funcionando con la app abierta, como antes.
 - **En la web y en Expo Go no hace nada** (`requireOptionalNativeModule`): la app funciona
   como en la 1.6.
 
-## Pensado para la parte 2 (ventana flotante)
+## Ventana flotante (1.8)
 
-La ventana flotante con el reloj encima de otras apps (y PiP como alternativa) podrá leer el
-mismo estado nativo (`TimerStore`, `TimerModel.snapshot`) y reaccionar a los mismos cambios
-(`seq`). No hace falta tocar el core ni el protocolo: solo añadir otra vista.
+Con **«Ventana flotante»** activada en el menú, al salir de la app con un reloj en marcha
+aparece el reloj de arena **solo** (vidrio y arena, fondo transparente) encima de las demás
+apps. Al volver a la app o al terminar el reloj, desaparece.
+
+### Por qué una vista nativa (Canvas) y no React Native
+
+La ventana tiene que seguir viva con la app en segundo plano y hasta con la parte JavaScript
+muerta (tras un aviso, un reinicio del móvil…). Por eso es una `View` de Kotlin dibujada con
+`Canvas` (`HourglassView.kt`) dentro de una ventana `TYPE_APPLICATION_OVERLAY`, y lee el mismo
+estado nativo que la notificación (`TimerStore` + `TimerModel.settle`). Cero JS, cero Skia.
+
+- **La silueta** es la del modelo «Clásico» del core (`profile.ts`), copiada en
+  `HourglassShape.kt`.
+- **El nivel de la arena** sale del tiempo que queda de verdad: se integra el área del vidrio
+  y se busca por bisección la altura que deja esa cantidad de arena arriba (con el embudo en V)
+  y abajo (con su montoncito). La paleta de granos es la de la app.
+- **Un chorro fino** de cinco granos cae por el cuello.
+- **Frecuencia:** ~12 fps en marcha, nada en pausa (la vista no se redibuja). Con las
+  animaciones del sistema desactivadas, va más lenta y sin volteo.
+- **Temas:** claro, oscuro o el del sistema, según el menú.
+- **Pausa:** el reloj se ve atenuado (`saveLayerAlpha`).
+- **Cambio de fase:** da la vuelta (700 ms) y la arena se rellena arriba.
+
+### Gestos
+
+| Gesto                      | Acción                                                                |
+| -------------------------- | --------------------------------------------------------------------- |
+| **Arrastrar**              | Se mueve; al soltar se acomoda suave en el borde izquierdo o derecho. |
+| **Pellizcar** (dos dedos)  | Más grande o más pequeño (44–124 dp de ancho; por defecto 58 dp).     |
+| **Tocar**                  | Abre la app.                                                          |
+| **Mantener pulsado**       | Pausa o reanuda.                                                      |
+| **Llevar a la × de abajo** | Lo quita hasta la próxima vez que salgas de la app (estilo burbuja).  |
+
+Con TalkBack, las mismas acciones están en el menú de acciones (tocar, mantener y «Quitar»).
+La posición (lado y altura relativa) y el tamaño se guardan (`FloatingStore.kt`).
+
+### Cuándo se ve: `FloatingPolicy`
+
+Una máquina de estados pura (`FloatingPolicy.kt`, con tests) decide a partir del interruptor,
+el permiso, si la app está a la vista y el estado del reloj:
+
+1. Interruptor apagado, sin permiso o sin reloj vivo → oculta.
+2. App a la vista → oculta (y se olvida que la quitaste).
+3. La quitaste con la × → oculta hasta que vuelvas a la app.
+4. App en segundo plano y reloj en marcha → visible.
+5. En pausa → se queda como estaba (si se veía, sigue atenuada; si saliste en pausa, no
+   aparece).
+
+Si la app está a la vista lo sabe `AppVisibility.kt` (cuenta las actividades iniciadas, con
+400 ms de margen para que un diálogo o un giro no la hagan parpadear). Cada cambio del reloj
+(sync desde JS, botón de la notificación, alarma, reinicio del móvil) vuelve a evaluar la
+política, así que la ventana también se actualiza con la app muerta.
+
+### Sin permiso: imagen en imagen
+
+Si «Ventana flotante» está activada pero falta «Mostrar sobre otras apps», al ir a inicio con
+un reloj en marcha la app entra en **imagen en imagen** (proporción 10:19) y muestra solo el
+reloj sobre el fondo del tema: sin tiempo, sin menú. En Android 12+ entra sola
+(`setAutoEnterEnabled`); en 8–11, con `onUserLeaveHint`. El _config plugin_ añade
+`supportsPictureInPicture` a la actividad.
+
+### Permiso y explicación
+
+La primera vez que se activa sin permiso, la app enseña una pantalla con el mismo estilo que
+«Gestos» (`FloatingHelp.tsx`): qué hace, los gestos y por qué Android pide el permiso. «Dar
+permiso» abre «Mostrar sobre otras apps» para esta app. Al volver, la app lo vuelve a
+comprobar; si sigue faltando, el menú lo avisa.
+
+### Probar el dibujo sin móvil
+
+`HourglassViewRenderTest` (Robolectric, gráficos nativos) dibuja la vista en la JVM y comprueba
+la arena, el chorro, los temas y la pausa. Para guardar las imágenes:
+
+```bash
+cd apps/mobile/android
+./gradlew :background-timer:testDebugUnitTest -Preloj.capturas=/ruta/a/capturas
+```
 
 ## Límites conocidos
 
@@ -126,4 +203,14 @@ mismo estado nativo (`TimerStore`, `TimerModel.snapshot`) y reaccionar a los mis
 - `USE_EXACT_ALARM` está permitido en Google Play para temporizadores, pero Play revisa su uso
   al publicar.
 - Hay que **instalar el APK nuevo**: el de la 1.3 no tiene el módulo (la app funciona, pero
-  sin notificación).
+  sin notificación). El de la 1.7 no tiene la ventana flotante.
+- **Ventana flotante:**
+  - Si cierras la app desde «Recientes» y el sistema mata el proceso, la ventana se va con él;
+    vuelve en el siguiente aviso (cambio de fase) o al abrir la app.
+  - En Xiaomi/HyperOS hace falta, además, permitir «Mostrar ventanas emergentes mientras se
+    ejecuta en segundo plano».
+  - No se ve sobre la pantalla de bloqueo.
+  - `SYSTEM_ALERT_WINDOW`: Google Play lo revisa al publicar; aquí solo se usa si lo activas.
+- **Imagen en imagen:** sin botones propios (Android pone los suyos); al terminar el reloj se
+  queda mostrando el reloj vacío hasta que la cierras.
+- La primera vez, los tests de dibujo (Robolectric) descargan sus librerías: necesitan red.
