@@ -14,6 +14,12 @@
   <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
   <!-- Al reiniciar el móvil se borran las alarmas: hay que volver a ponerlas. -->
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+  <!--
+    Ventana flotante (1.8): el reloj encima de otras apps. Es un permiso
+    especial: no sale un diálogo, el usuario lo activa en Ajustes
+    («Mostrar sobre otras apps»). Sin él se usa imagen en imagen.
+  -->
+  <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
   <application>
     <!-- Cambio de fase o fin: lo despierta AlarmManager a su hora. -->

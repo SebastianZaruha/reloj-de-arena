@@ -22,6 +22,12 @@ class StoredState(val payload: JSONObject, val seq: Int) {
   val sound: Boolean get() = payload.optBoolean("sound", true)
   val vibration: Boolean get() = payload.optBoolean("vibration", true)
 
+  /** Interruptor «Ventana flotante» (1.8). */
+  val floating: Boolean get() = payload.optBoolean("floating", false)
+
+  /** Tema elegido: "light", "dark" o "system" (Automático). */
+  val theme: String get() = payload.optString("theme", "system")
+
   /** Texto traducido (o el de reserva si faltara). */
   fun text(key: String, fallback: String): String =
     payload.optJSONObject("texts")?.optString(key)?.takeIf { it.isNotEmpty() } ?: fallback

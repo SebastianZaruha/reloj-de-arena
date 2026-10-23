@@ -1,24 +1,27 @@
 /**
- * Plugin de configuración de Expo para el módulo de segundo plano.
+ * Plugin de configuración de Expo para el módulo de segundo plano. En cada
+ * `npx expo prebuild` hace dos cosas en la carpeta android/ (que se genera
+ * y no se versiona):
  *
- * Los avisos de la notificación suenan con los MISMOS mp3 que la app
- * (assets/sounds). Un canal de notificación de Android solo puede usar un
- * sonido de `res/raw`, así que en cada `npx expo prebuild` este plugin los
- * copia allí con un prefijo (para no chocar con recursos de otras librerías):
+ * 1. Sonidos. Los avisos de la notificación suenan con los MISMOS mp3 que la
+ *    app (assets/sounds). Un canal de notificación de Android solo puede
+ *    usar un sonido de `res/raw`, así que se copian allí con un prefijo
+ *    (para no chocar con recursos de otras librerías):
  *
- *   assets/sounds/fin.mp3    → android/app/src/main/res/raw/reloj_fin.mp3
- *   assets/sounds/cambio.mp3 → android/app/src/main/res/raw/reloj_cambio.mp3
+ *      assets/sounds/fin.mp3    → android/app/src/main/res/raw/reloj_fin.mp3
+ *      assets/sounds/cambio.mp3 → android/app/src/main/res/raw/reloj_cambio.mp3
  *
- * La carpeta android/ se genera y no se versiona: la única copia de los
- * sonidos sigue siendo la de assets/sounds.
+ * 2. Imagen en imagen (1.8). La actividad principal declara
+ *    `android:supportsPictureInPicture="true"`: es el plan B de la ventana
+ *    flotante cuando no hay permiso para dibujar encima de otras apps.
  */
 const fs = require('fs');
 const path = require('path');
-const { withDangerousMod } = require('expo/config-plugins');
+const { withAndroidManifest, withDangerousMod } = require('expo/config-plugins');
 
 const SOUNDS = { 'fin.mp3': 'reloj_fin.mp3', 'cambio.mp3': 'reloj_cambio.mp3' };
 
-module.exports = function withBackgroundTimerSounds(config) {
+function withSounds(config) {
   return withDangerousMod(config, [
     'android',
     async (cfg) => {
@@ -31,4 +34,17 @@ module.exports = function withBackgroundTimerSounds(config) {
       return cfg;
     },
   ]);
+}
+
+function withPictureInPicture(config) {
+  return withAndroidManifest(config, (cfg) => {
+    const app = cfg.modResults.manifest.application?.[0];
+    const main = app?.activity?.find((a) => a.$['android:name'] === '.MainActivity');
+    if (main) main.$['android:supportsPictureInPicture'] = 'true';
+    return cfg;
+  });
+}
+
+module.exports = function withBackgroundTimer(config) {
+  return withPictureInPicture(withSounds(config));
 };

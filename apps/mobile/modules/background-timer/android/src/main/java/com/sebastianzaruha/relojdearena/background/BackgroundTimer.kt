@@ -13,6 +13,9 @@ import org.json.JSONObject
  *   alarma   ── onAlarm   ──▶ pasa de fase (TimerModel.settle) · notificación · aviso
  *   reinicio ── restore   ──▶ vuelve a poner alarmas y notificación
  *
+ * Después de cada cambio se avisa a la ventana flotante (`FloatingWindow`),
+ * que decide si se ve y se repinta con la sesión nueva.
+ *
  * Todo es rápido (leer/escribir unas preferencias y pintar una notificación),
  * así que se hace directamente en el receptor, sin servicios en primer plano.
  */
@@ -45,6 +48,7 @@ object BackgroundTimer {
     val state = StoredState(payload, seq)
     TimerStore.save(context, state)
     render(context, state, state.session, state.events)
+    FloatingWindow.update(context, FloatingEvent.STATE_CHANGED)
     return true
   }
 
@@ -67,6 +71,7 @@ object BackgroundTimer {
     TimerStore.save(context, updated)
     if (next.isFinished) TimerNotifications.alertFinished(context, updated)
     render(context, updated, next, TimerModel.events(next))
+    FloatingWindow.update(context, FloatingEvent.STATE_CHANGED)
     listener?.invoke(updated.seq)
   }
 
@@ -75,6 +80,9 @@ object BackgroundTimer {
     val state = TimerStore.load(context) ?: return
     // Si Android la entrega unos milisegundos antes, cuenta como a su hora.
     val updated = advance(context, state, maxOf(System.currentTimeMillis(), at))
+    // Fin: se quita. Cambio de fase: la ventana ya gira sola; si el proceso
+    // había muerto, aquí vuelve a aparecer.
+    FloatingWindow.update(context, FloatingEvent.STATE_CHANGED)
     val session = updated.session ?: return
     // Las alarmas que faltan ya están programadas: solo cambia la notificación.
     if (session.isRunning || session.isPaused) TimerNotifications.showCountdown(context, updated, session)
@@ -112,6 +120,7 @@ object BackgroundTimer {
     val state = advance(context, TimerStore.load(context) ?: return, System.currentTimeMillis())
     val session = state.session ?: return
     render(context, state, session, TimerModel.events(session))
+    FloatingWindow.update(context, FloatingEvent.STATE_CHANGED)
   }
 
   /** Para la app: la sesión guardada y el último `seq`, en JSON. */

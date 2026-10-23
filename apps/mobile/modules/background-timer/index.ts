@@ -1,6 +1,7 @@
 /**
  * Módulo nativo de segundo plano (Android): notificación con la cuenta atrás,
- * botones y avisos con la app cerrada. El código nativo está en `android/`
+ * botones y avisos con la app cerrada; desde la 1.8, la ventana flotante y
+ * la imagen en imagen. El código nativo está en `android/`
  * (Kotlin) y la explicación en docs/SEGUNDO_PLANO.md.
  *
  * `requireOptionalNativeModule` devuelve null si el módulo no está compilado
@@ -15,11 +16,15 @@ export interface BackgroundPermissions {
   readonly notifications: boolean;
   /** ¿Se pueden programar alarmas exactas? (Android 12+: «Alarmas y recordatorios») */
   readonly exactAlarms: boolean;
+  /** ¿Puede dibujar encima de otras apps? («Mostrar sobre otras apps», ventana flotante 1.8) */
+  readonly overlay: boolean;
 }
 
 type Events = {
   /** Se ha pausado, reanudado o reiniciado desde la notificación. */
   onChange: (event: { seq: number }) => void;
+  /** La app entra (`active`) o sale de imagen en imagen (1.8). */
+  onPictureInPicture: (event: { active: boolean }) => void;
 };
 
 declare class BackgroundTimerModule extends NativeModule<Events> {
@@ -31,6 +36,8 @@ declare class BackgroundTimerModule extends NativeModule<Events> {
   getPermissions(): BackgroundPermissions;
   openNotificationSettings(): void;
   openExactAlarmSettings(): void;
+  isInPictureInPicture(): boolean;
+  openOverlaySettings(): void;
 }
 
 export const BackgroundTimer = requireOptionalNativeModule<BackgroundTimerModule>('BackgroundTimer');

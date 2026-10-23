@@ -22,14 +22,17 @@ class BackgroundTimerModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("BackgroundTimer")
 
-    // { seq }: se ha pausado, reanudado o reiniciado desde la notificación.
-    Events("onChange")
+    // { seq }: se ha pausado, reanudado o reiniciado desde la notificación
+    // (o desde la ventana flotante). { active }: entra o sale de imagen en imagen.
+    Events("onChange", "onPictureInPicture")
 
     OnCreate {
       BackgroundTimer.listener = { seq -> sendEvent("onChange", mapOf("seq" to seq)) }
+      PictureInPicture.listener = { active -> sendEvent("onPictureInPicture", mapOf("active" to active)) }
     }
     OnDestroy {
       BackgroundTimer.listener = null
+      PictureInPicture.listener = null
     }
     OnActivityEntersForeground {
       BackgroundTimer.appInForeground = true
@@ -58,7 +61,20 @@ class BackgroundTimerModule : Module() {
       mapOf(
         "notifications" to TimerNotifications.enabled(context),
         "exactAlarms" to TimerAlarms.canScheduleExact(context),
+        "overlay" to FloatingWindow.canDraw(context),
       )
+    }
+
+    /** ¿Está la app ahora mismo en imagen en imagen? */
+    Function("isInPictureInPicture") {
+      PictureInPicture.isActive()
+    }
+
+    /** Ajustes del sistema → «Mostrar sobre otras apps» de esta app (1.8). */
+    Function("openOverlaySettings") {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        start(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}")))
+      }
     }
 
     /** Ajustes del sistema → Notificaciones de esta app. */

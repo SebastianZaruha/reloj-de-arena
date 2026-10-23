@@ -52,6 +52,7 @@ export interface BackgroundTexts {
   readonly channelSoundOnly: string;
   readonly channelVibrationOnly: string;
   /** Ventana flotante, para el lector de pantalla (1.8). */
+  readonly paused: string;
   readonly floatingLabel: string;
   readonly floatingHint: string;
   readonly floatingClose: string;
@@ -130,6 +131,7 @@ function backgroundTexts(tr: Messages, isCycle: boolean): BackgroundTexts {
     channelPhase: tr.channelPhase,
     channelSoundOnly: tr.channelSoundOnly,
     channelVibrationOnly: tr.channelVibrationOnly,
+    paused: tr.paused,
     floatingLabel: tr.floatingLabel,
     floatingHint: tr.floatingHint,
     floatingClose: tr.floatingClose,

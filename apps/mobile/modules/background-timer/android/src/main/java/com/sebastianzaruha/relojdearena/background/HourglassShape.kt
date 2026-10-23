@@ -78,6 +78,20 @@ object HourglassShape {
   /** Radio del hueco (donde cabe la arena). */
   fun innerRadiusAt(u: Double): Double = max(0.0, radiusAt(u) - WALL)
 
+  /**
+   * Hasta dónde llega el contorno al DIBUJARLO: un pelín más allá de u = 1,
+   * donde la pera del bulbo se cierra en redondo (en u = 1 aún mide ~0,26 y
+   * el reloj acabaría en un borde plano).
+   */
+  const val OUTLINE_END = BULB_CENTER + BULB_RADIUS_Y
+
+  /** Radio para dibujar el contorno: `radiusAt` y, pasado u = 1, el cierre redondo del bulbo. */
+  fun outlineRadiusAt(u: Double, inner: Boolean = false): Double {
+    val au = abs(u)
+    val r = if (au <= 1) radiusAt(au) else bulbShape((au - BULB_CENTER) / BULB_RADIUS_Y) / NORM
+    return if (inner) max(0.0, r - WALL) else r
+  }
+
   // ─── Cuánta arena cabe: áreas acumuladas ────────────────────────────────
   // La arena de la app es una simulación 2D (granos en una rejilla), así que
   // aquí también contamos ÁREA de la silueta, no volumen.
