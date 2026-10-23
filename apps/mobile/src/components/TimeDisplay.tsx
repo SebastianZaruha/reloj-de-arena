@@ -13,6 +13,7 @@
  * el tiempo y la fase a través del propio reloj (ver TimerScreen), así
  * evitamos que lo anuncie dos veces.
  */
+import { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import Animated, { interpolateColor, useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 
@@ -24,8 +25,18 @@ import { DARK_THEME, LIGHT_THEME } from '../theme/theme';
  */
 export const TIME_LINE_HEIGHT = 44;
 
+/** Cada cuánto se mira si el texto ha cambiado mientras corre el tiempo (ms). */
+const REFRESH_MS = 250;
+
 interface Props {
+  /** Texto en el último render de la pantalla. */
   readonly text: string;
+  /**
+   * Mientras corre el tiempo (1.8.1), el texto se pide aquí cada 250 ms y
+   * solo se re-renderiza ESTE componente (y solo si cambia, una vez por
+   * segundo). Así la pantalla entera no se vuelve a pintar 4 veces por segundo.
+   */
+  readonly refresh?: (() => string) | null;
   readonly hint: string | null;
   readonly label?: string | null;
   readonly bottom: number;
@@ -37,7 +48,17 @@ interface Props {
 const L = LIGHT_THEME.text;
 const D = DARK_THEME.text;
 
-export function TimeDisplay({ text, hint, label = null, bottom, fonts, themeProgress, opacity }: Props) {
+export function TimeDisplay({
+  text,
+  refresh = null,
+  hint,
+  label = null,
+  bottom,
+  fonts,
+  themeProgress,
+  opacity,
+}: Props) {
+  const shown = useLiveText(text, refresh);
   const fade = useAnimatedStyle(() => ({ opacity: opacity.value }));
   const timeColor = useAnimatedStyle(() => ({
     color: interpolateColor(themeProgress.value, [0, 1], [L.time, D.time]),
@@ -65,10 +86,29 @@ export function TimeDisplay({ text, hint, label = null, bottom, fonts, themeProg
         </Animated.Text>
       ) : null}
       <Animated.Text style={[styles.time, { fontFamily: fonts.time }, timeColor]} testID="tiempo">
-        {text}
+        {shown}
       </Animated.Text>
     </Animated.View>
   );
+}
+
+/**
+ * El texto que se ve: el de la pantalla o, mientras hay `refresh`, el que
+ * devuelve cada REFRESH_MS. Si la pantalla manda un texto nuevo (pausa,
+ * cambio de fase...), se usa ese al momento.
+ */
+function useLiveText(text: string, refresh: (() => string) | null): string {
+  const [live, setLive] = useState<{ base: string; value: string } | null>(null);
+  useEffect(() => {
+    if (!refresh) return;
+    const id = setInterval(() => {
+      const value = refresh();
+      setLive((prev) => (prev && prev.base === text && prev.value === value ? prev : { base: text, value }));
+    }, REFRESH_MS);
+    return () => clearInterval(id);
+  }, [refresh, text]);
+  // Un valor «vivo» de un texto anterior ya no vale.
+  return refresh && live && live.base === text ? live.value : text;
 }
 
 const styles = StyleSheet.create({

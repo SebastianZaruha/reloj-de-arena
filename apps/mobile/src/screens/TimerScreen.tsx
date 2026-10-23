@@ -95,6 +95,7 @@ import { playSelectionTick, playTimerHaptic, useTimerHaptics } from '../haptics'
 import { Hourglass, type PauseBlur } from '../hourglass';
 import { useKeepAwakeWhile } from '../hooks/useKeepAwakeWhile';
 import { useLatest } from '../hooks/useLatest';
+import { useRefreshWhile, useScreenReaderEnabled } from '../hooks/useScreenReader';
 import { useSession } from '../hooks/useSession';
 import type { UseSettings } from '../hooks/useSettings';
 import { useIntro } from '../intro/useIntro';
@@ -151,6 +152,17 @@ export function TimerScreen({ settings, fonts }: Props) {
   );
   const session = useSession(plan, appClock);
   const { view } = session;
+  // La pantalla ya no se re-renderiza en cada refresco del tiempo (1.8.1):
+  // con el lector de pantalla encendido, una vez por segundo para que el
+  // valor que lee («quedan…») esté al día.
+  const screenReader = useScreenReaderEnabled();
+  useRefreshWhile(screenReader && view.status === 'running', 1000);
+  const { getSnapshot } = session;
+  /** Texto del tiempo, al momento (TimeDisplay lo pide mientras corre). */
+  const liveTime = useCallback(() => {
+    const now = getSnapshot();
+    return formatDuration(now.status === 'idle' ? now.durationMs : now.remainingMs);
+  }, [getSnapshot]);
   const latest = useLatest(session);
   useEffect(() => {
     if (!samePlan(plan, latest.current.state.plan)) latest.current.replacePlan(plan);
@@ -419,6 +431,22 @@ export function TimerScreen({ settings, fonts }: Props) {
   };
 
   // ─── Diseño ─────────────────────────────────────────────────────────────
+  // El vidrio del menú va DENTRO del lienzo del reloj. Memorizado: si no, cada
+  // render de la pantalla sería un hijo «nuevo» y el lienzo Skia entero se
+  // volvería a reconciliar aunque no cambie nada.
+  const frosted = useMemo(
+    () =>
+      sheet.visible ? (
+        <FrostedPanel
+          width={width}
+          height={height}
+          top={sheet.top}
+          openness={sheet.openness}
+          themeProgress={themeProgress}
+        />
+      ) : null,
+    [sheet.visible, sheet.top, sheet.openness, width, height, themeProgress],
+  );
   // En imagen en imagen no hay textos ni menú: el reloj ocupa toda la ventanita.
   const insets = useMemo(
     () => (pip ? PIP_INSETS : { top: safe.top + 12, bottom: safe.bottom + BOTTOM_AREA }),
@@ -472,15 +500,7 @@ export function TimerScreen({ settings, fonts }: Props) {
               pose={intro.pose}
               poseActive={intro.active}
             >
-              {sheet.visible ? (
-                <FrostedPanel
-                  width={width}
-                  height={height}
-                  top={sheet.top}
-                  openness={sheet.openness}
-                  themeProgress={themeProgress}
-                />
-              ) : null}
+              {frosted}
             </Hourglass>
           </HourglassBoundary>
         </View>
@@ -498,6 +518,7 @@ export function TimerScreen({ settings, fonts }: Props) {
           />
           <TimeDisplay
             text={formatDuration(displayMs)}
+            refresh={view.status === 'running' ? liveTime : null}
             hint={hint}
             label={label}
             // Con el móvil volteado la capa gira 180°: su "abajo" es el borde

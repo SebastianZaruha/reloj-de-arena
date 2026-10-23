@@ -6,9 +6,11 @@
  * - El estado vive en un `useState` (para re-renderizar al cambiar) y en una
  *   ref (para que el bucle de animación y los gestos lo lean sin esperar a
  *   React). La ref solo cambia en `apply`.
- * - Mientras corre, refrescamos 4 veces por segundo. No importa si algún
- *   refresco se retrasa: el tiempo y los cambios de fase se calculan con
- *   marcas de tiempo (`settle` en el core), nunca contando ticks.
+ * - Mientras corre, miramos 4 veces por segundo si ha cambiado de fase o
+ *   terminado; la pantalla solo se re-renderiza si es así (el texto del
+ *   tiempo se refresca solo, ver TimeDisplay). No importa si algún refresco
+ *   se retrasa: el tiempo y los cambios de fase se calculan con marcas de
+ *   tiempo (`settle` en el core), nunca contando ticks.
  * - Al volver de segundo plano (AppState "active") forzamos un refresco: si
  *   pasaron varias fases mientras tanto, `tickSession` las recorre de golpe.
  * - 1.7 (Android): al arrancar, si la notificación siguió una cuenta con la
@@ -85,13 +87,15 @@ export function useSession(initialPlan: SessionPlan, clock: Clock = systemClock)
 
   const getSnapshot = useCallback(() => sessionSnapshot(stateRef.current, clock.now()), [clock]);
 
-  // Refresco periódico solo mientras corre.
+  // Mientras corre, se mira cada poco si ha cambiado de fase o terminado.
+  // Solo entonces cambia el estado y se re-renderiza la pantalla (1.8.1):
+  // antes se forzaba un render de TODA la pantalla 4 veces por segundo, y
+  // el texto del tiempo ya se refresca solo (TimeDisplay, `refresh`).
   const running = state.timer.status === 'running';
   useEffect(() => {
     if (!running) return;
     const id = setInterval(() => {
       apply((s) => tickSession(s, clock.now()));
-      forceRender((n) => n + 1);
     }, DISPLAY_REFRESH_MS);
     return () => clearInterval(id);
   }, [running, apply, clock]);

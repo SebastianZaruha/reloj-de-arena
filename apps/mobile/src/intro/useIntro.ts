@@ -19,7 +19,7 @@
  * Al girar, el reloj (alto y estrecho) se pondría horizontal y no cabría a
  * lo ancho: <Hourglass> lo encoge lo justo según el ángulo (ver `fit`).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Easing, useSharedValue, withDelay, withTiming, type SharedValue } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
@@ -93,5 +93,10 @@ export function useIntro(reduceMotion: boolean): Intro {
     chrome.set(withDelay(INTRO.chromeDelay, withTiming(1, { duration: INTRO.chromeFade })));
   }, [play, animate, rotate, scale, centered, opacity, shadow, chrome]);
 
-  return { pose: { rotate, scale, centered, opacity, shadow }, active, chrome };
+  // Siempre el mismo objeto: así <Hourglass> (memo) no se re-renderiza por él.
+  const pose = useMemo(
+    () => ({ rotate, scale, centered, opacity, shadow }),
+    [rotate, scale, centered, opacity, shadow],
+  );
+  return { pose, active, chrome };
 }

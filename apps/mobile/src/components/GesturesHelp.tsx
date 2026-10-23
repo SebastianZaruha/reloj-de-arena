@@ -9,6 +9,7 @@
  * Android y con Escape en la web. Para el lector de pantalla es una vista
  * modal con un encabezado y una lista de textos.
  */
+import { memo } from 'react';
 import { useT } from '../i18n/I18n';
 import { InfoRow, InfoScreen, circle, type InfoScreenProps } from './InfoScreen';
 
@@ -31,7 +32,7 @@ export const GESTURE_ICONS = {
 type GestureKey = keyof typeof GESTURE_ICONS;
 const ROWS: readonly GestureKey[] = ['tap', 'swipe', 'hold', 'side', 'flip', 'sheet'];
 
-export function GesturesHelp(props: InfoScreenProps) {
+function GesturesHelpScreen(props: InfoScreenProps) {
   const t = useT();
   const texts: Record<GestureKey, string> = {
     tap: t.gestureTap,
@@ -64,3 +65,6 @@ export function GesturesHelp(props: InfoScreenProps) {
     </InfoScreen>
   );
 }
+
+/** `memo`: solo se re-renderiza si cambian sus props (no con cada render de la pantalla). */
+export const GesturesHelp = memo(GesturesHelpScreen);

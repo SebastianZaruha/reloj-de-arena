@@ -8,6 +8,7 @@
  * para este permiso); «Ahora no» deja la ventana activada, y entonces la app
  * usa imagen en imagen.
  */
+import { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
@@ -29,7 +30,7 @@ interface Props extends InfoScreenProps {
   readonly onAllow: () => void;
 }
 
-export function FloatingHelp({ onAllow, ...props }: Props) {
+function FloatingHelpScreen({ onAllow, ...props }: Props) {
   const t = useT();
   const { fonts, theme } = props;
   const rows = [
@@ -118,3 +119,6 @@ const styles = StyleSheet.create({
   secondaryText: { fontSize: 14, letterSpacing: 0.3 },
   pressed: { opacity: 0.6 },
 });
+
+/** `memo`: solo se re-renderiza si cambian sus props (no con cada render de la pantalla). */
+export const FloatingHelp = memo(FloatingHelpScreen);

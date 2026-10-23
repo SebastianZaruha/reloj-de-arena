@@ -15,7 +15,7 @@
  * viaja al módulo con el resto del estado (useBackgroundTimer).
  */
 import type { Messages, Settings } from '@reloj/core';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 
 import { BackgroundTimer } from '../../modules/background-timer';
@@ -75,7 +75,13 @@ export function useFloatingWindow(settings: Settings, update: (patch: SettingsPa
     };
   }, [native]);
 
-  const openSettings = () => native?.openOverlaySettings();
+  const openSettings = useCallback(() => native?.openOverlaySettings(), [native]);
+  // Estables entre renders: FloatingHelp es `memo` y no se re-renderiza por ellas.
+  const allow = useCallback(() => {
+    setIntroOpen(false);
+    openSettings();
+  }, [openSettings]);
+  const closeIntro = useCallback(() => setIntroOpen(false), []);
 
   const toggle = (on: boolean) => {
     const explain = on && !canDraw && !settings.floatingExplained;
@@ -93,11 +99,8 @@ export function useFloatingWindow(settings: Settings, update: (patch: SettingsPa
         ? { text: tr.floatingPipNotice, onPress: openSettings }
         : null,
     introOpen,
-    allow: () => {
-      setIntroOpen(false);
-      openSettings();
-    },
-    closeIntro: () => setIntroOpen(false),
+    allow,
+    closeIntro,
     pip: pip || DEV_PIP,
   };
   return window;
