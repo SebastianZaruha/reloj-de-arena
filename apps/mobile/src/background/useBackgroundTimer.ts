@@ -79,14 +79,15 @@ export function useBackgroundTimer({ session, settings, update, tr }: Options): 
       // Con la sesión de la notificación (o, si no se pudo aplicar, la de la app).
       syncBackground(latest.current.session.state, appClock.now(), t, { ...options, force: true });
     };
-    /** Relee los permisos; si alguno ha cambiado, se vuelve a pintar la notificación. */
+    /** Relee los permisos (pueden haberse cambiado en Ajustes) y vuelve a pintar la notificación. */
     const refresh = () => {
       const now = readPermissions();
       const old = latest.current.permissions;
       if (now.notifications !== old.notifications || now.exactAlarms !== old.exactAlarms) {
         setPermissions(now);
-        send(true);
       }
+      // Forzado: en Android 14+ la notificación se puede descartar deslizando y así vuelve.
+      send(true);
     };
     return { catchUp, send, refresh };
   });
@@ -100,7 +101,7 @@ export function useBackgroundTimer({ session, settings, update, tr }: Options): 
       actions.send();
     });
     // A la vista o no: decide quién avisa, la app o la notificación. Al volver,
-    // nos ponemos al día y releemos los permisos (pueden haberse cambiado en Ajustes).
+    // nos ponemos al día, releemos los permisos y repintamos la notificación.
     native.setForeground(AppState.currentState !== 'background');
     const visibility = AppState.addEventListener('change', (state) => {
       native.setForeground(state === 'active');
