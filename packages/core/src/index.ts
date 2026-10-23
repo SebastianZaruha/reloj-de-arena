@@ -7,6 +7,7 @@
  */
 export * from './timer';
 export * from './session';
+export * from './background';
 export * from './settings';
 export * from './catalog';
 export * from './geometry';
