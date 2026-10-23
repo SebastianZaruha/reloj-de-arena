@@ -78,6 +78,6 @@ export function useFramePacer(): FramePacer {
         frames.setActive(false);
       },
     }),
-    [frames, wanted],
+    [frames, wanted, busy],
   );
 }
