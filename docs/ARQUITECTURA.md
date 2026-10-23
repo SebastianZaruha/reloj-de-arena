@@ -157,9 +157,12 @@ su ángulo de reposo, el cráter del bulbo superior y los deslizamientos.
   **recoloca** directamente en su estado asentado en vez de animar horas de caída. El umbral
   y los granos por fotograma se adaptan al caudal (`flowBudget`): un retraso corto con mucho
   caudal (el giro de un cambio de fase) se recupera fluyendo, sin «reiniciar» la arena.
-- **Chorro según el caudal (1.6):** el chorro decorativo recibe el caudal real (granos/s); por
-  encima de ~20 granos/s se va cerrando y a ~180 granos/s es un hilo continuo
-  (`streamContinuity`). Con caudales normales se ve igual que en la 1.4.
+- **Igual a cualquier fps (1.6):** a 60 fps (el móvil) todo va como siempre: una sincronización
+  y dos pasos de arena por fotograma, y el chorro emite y mueve sus granos una vez. Si el
+  fotograma es más largo (el navegador sin GPU va a 12–30 fps), la arena da los pasos que le
+  tocarían a 60 fps (hasta 3 «fotogramas de 60» por fotograma) y el chorro se parte en subpasos
+  de ≤ 1/50 s. Antes, a pocos fps la arena caía más despacio que el tiempo y salía a tirones, y
+  el chorro salía a paquetes y con menos granos.
 - **Rendimiento:** solo se procesan los granos «despiertos» (los que se movieron o tienen un
   vecino que se movió). La arena en reposo no cuesta nada. En Node sin JIT (parecido a
   Hermes) un fotograma con dos pasos ronda 1,5–2 ms. Cuando nada se mueve, el bucle se detiene.

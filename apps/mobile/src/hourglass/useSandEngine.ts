@@ -40,7 +40,6 @@ import {
   MIN_DURATION_MS,
   flowBudget,
   MIN_FLOW_GRAVITY_Y,
-  nominalFlowRate,
   sandLevelForDuration,
   StreamParticles,
   syncSandToTarget,
@@ -92,6 +91,13 @@ export const TURN_MS = 950;
 
 /** Pasos de simulación por fotograma (más = arena más "viva", más CPU). */
 const STEPS_PER_FRAME = 2;
+/**
+ * Fotogramas largos (el navegador a 20–30 fps): la arena da los pasos que
+ * le tocarían a 60 fps, hasta este máximo de «fotogramas de 60» por
+ * fotograma. Sin esto, a pocos fps la arena caía más despacio que el
+ * tiempo, se acumulaba retraso y salía a tirones. A 60 fps: 1 (como siempre).
+ */
+const MAX_CATCH_UP = 3;
 /** Cambio mínimo de inclinación para regrabar las capas del vidrio (más pequeño no se ve). */
 const LIGHT_EPSILON = 0.01;
 
@@ -160,7 +166,6 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
       intensity: 1,
       gravity: { x: 0, y: 1 },
       calm: false,
-      flowRate: 0,
     } as StreamInput,
     /** Marca de tiempo del fotograma anterior (para calcular dt). */
     lastTime: 0,
@@ -219,6 +224,11 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
       }
 
       const now = performance.now();
+      const frameDt = state.lastTime > 0 ? (now - state.lastTime) / 1000 : 1 / 60;
+      state.lastTime = now;
+      // Cuántos «fotogramas de 60 fps» caben en este (1 a 60 fps; el margen
+      // evita que un fotograma de 17–24 ms cuente doble).
+      const ticks = Math.min(MAX_CATCH_UP, Math.max(1, Math.round(frameDt * 60 - 0.2)));
 
       // 0b) Cambio de fase (ciclos): empieza el giro animado del reloj.
       const turns = snap.transitions ?? 0;
@@ -269,18 +279,19 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
         particles.reset(7);
         changed = true;
       }
-      // (Durante el giro no: la arena va quieta dentro del vidrio.)
-      if (snap.status !== 'idle' && state.turnStart === null) {
-        const target = targetSourceGrains(state.runInitial, snap.remainingMs, snap.durationMs);
-        // Límites según el caudal: con mucha arena y poco tiempo puede pasar
-        // más por fotograma y no se recoloca por un simple retraso.
-        const budget = flowBudget(state.runInitial, snap.durationMs, p.sim.totalGrains);
-        if (syncSandToTarget(p.sim, target, gs, budget) !== 'idle') changed = true;
-      }
-
-      // 3) Física.
-      for (let i = 0; i < STEPS_PER_FRAME; i++) {
-        if (p.sim.step(gs) > 0) changed = true;
+      // 2-3) Sincronizar y mover la arena, una vez por «fotograma de 60 fps»
+      //      (a 60 fps, una vez). Durante el giro no se sincroniza: la arena
+      //      va quieta dentro del vidrio.
+      const syncing = snap.status !== 'idle' && state.turnStart === null;
+      const target = syncing ? targetSourceGrains(state.runInitial, snap.remainingMs, snap.durationMs) : 0;
+      // Límites según el caudal: con mucha arena y poco tiempo puede pasar
+      // más por fotograma y no se recoloca por un simple retraso.
+      const budget = syncing ? flowBudget(state.runInitial, snap.durationMs, p.sim.totalGrains) : null;
+      for (let k = 0; k < ticks; k++) {
+        if (budget && syncSandToTarget(p.sim, target, gs, budget) !== 'idle') changed = true;
+        for (let i = 0; i < STEPS_PER_FRAME; i++) {
+          if (p.sim.step(gs) > 0) changed = true;
+        }
       }
 
       // 3b) Granos sueltos del chorro. Siguen cayendo aunque el flujo se
@@ -292,12 +303,9 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
         gs.y >= MIN_FLOW_GRAVITY_Y &&
         p.sim.hasGrainAtNeck(gs);
       const pin = state.particleInput;
-      pin.dt = state.lastTime > 0 ? (now - state.lastTime) / 1000 : 1 / 60;
-      state.lastTime = now;
+      pin.dt = frameDt;
       pin.emitting = streaming;
       pin.intensity = streamIntensity(snap.durationMs);
-      // Caudal real de esta tanda: con mucho, el chorro es un hilo continuo.
-      pin.flowRate = nominalFlowRate(state.runInitial, snap.durationMs);
       pin.gravity = g;
       pin.calm = p.reduceMotion;
       particles.update(p.sim, pin);

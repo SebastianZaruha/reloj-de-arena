@@ -4,18 +4,19 @@
  * El fallo que vio Sebastián en un ciclo corto: tras el giro de cambio de
  * fase, el bulbo de arriba (lleno) se llenaba de rayas horizontales y un
  * enrejado en V durante ~1 s, unos granos bajaban «en bloque» bajo el cuello
- * y el chorro salía a trompicones. Estos tests fijan cada causa.
+ * y el chorro salía a trompicones (esto último, solo en el navegador: a pocos
+ * fps). Estos tests fijan cada causa.
  */
 import { describe, expect, it } from 'vitest';
 import {
   CLASSIC_MODEL,
   GRAVITY_DOWN,
+  PARTICLE_FALL,
   SAND,
   SandSimulation,
   StreamParticles,
   flowBudget,
   nominalFlowRate,
-  streamContinuity,
   syncSandToTarget,
   targetSourceGrains,
 } from '../src';
@@ -148,37 +149,36 @@ describe('caudal alto: ni «reinicios» ni chorro a trompicones', () => {
     expect(nominalFlowRate(100, 0)).toBe(0);
   });
 
-  it('el chorro es continuo con mucho caudal y conserva sus huecos con poco', () => {
-    expect(streamContinuity(undefined)).toBe(0);
-    expect(streamContinuity(10)).toBe(0);
-    expect(streamContinuity(180)).toBe(1);
-
-    /** Hueco más largo (s) sin granos nuevos saliendo del cuello en 4 s. */
-    const longestGap = (flowRate: number | undefined): number => {
+  it('el chorro no depende de los fps (a 12–30 fps sale igual que a 60)', () => {
+    /** Granos emitidos en 3 s y mayor hueco vertical (celdas) entre granos del chorro. */
+    const run = (fps: number): { emitted: number; gap: number } => {
       const sim = makeSim(61);
       sim.arrange(Math.round(sim.totalGrains * 0.8), sim.totalGrains - Math.round(sim.totalGrains * 0.8));
       const p = new StreamParticles({ capacity: 360, seed: 7 });
-      let last = 0;
       let gap = 0;
-      for (let f = 1; f <= 240; f++) {
-        const before = p.emitted;
-        p.update(sim, {
-          dt: 1 / 60,
-          emitting: true,
-          intensity: 1,
-          gravity: GRAVITY_DOWN,
-          calm: false,
-          flowRate,
-        });
-        if (p.emitted > before) {
-          gap = Math.max(gap, (f - last) / 60);
-          last = f;
+      for (let f = 1; f <= 3 * fps; f++) {
+        p.update(sim, { dt: 1 / fps, emitting: true, intensity: 1, gravity: GRAVITY_DOWN, calm: false });
+        // Tramo alto del chorro (6 celdas bajo el cuello), donde los
+        // «paquetes» por fotograma se notaban más.
+        const ys: number[] = [];
+        for (let i = 0; i < p.count; i++) {
+          const dy = p.y[i]! - sim.gateRow;
+          if (p.kind[i] === PARTICLE_FALL && dy > 0 && dy < 6) ys.push(dy);
         }
+        ys.sort((a, b) => a - b);
+        let g = 0;
+        for (let i = 1; i < ys.length; i++) g = Math.max(g, ys[i]! - ys[i - 1]!);
+        if (ys.length > 4) gap = Math.max(gap, g);
       }
-      return gap;
+      return { emitted: p.emitted, gap };
     };
-    expect(longestGap(250)).toBeLessThan(0.05);
-    // El aspecto de siempre (1.2–1.4) con poco caudal: huecos naturales.
-    expect(longestGap(5)).toBeGreaterThan(0.1);
+    const at60 = run(60);
+    // Antes: a 20 fps el hueco crecía ~45 % (granos a paquetes) y a 12 fps
+    // salía casi la mitad de arena (el paso se recortaba a 1/20 s).
+    for (const fps of [30, 20, 12]) {
+      const r = run(fps);
+      expect(Math.abs(r.emitted - at60.emitted) / at60.emitted).toBeLessThan(0.05);
+      expect(r.gap).toBeLessThan(at60.gap * 1.1);
+    }
   });
 });
