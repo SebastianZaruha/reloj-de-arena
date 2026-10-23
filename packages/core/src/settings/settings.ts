@@ -16,16 +16,17 @@ import {
   type CyclePresetId,
   type SessionMode,
 } from '../session/cycles';
+import type { LanguagePreference } from '../i18n/messages';
 import { DEFAULT_DURATION_MS, snapDuration } from '../timer/duration';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
 /**
  * Versión del esquema. 2 (app 1.5): añade sonido, modo de sesión y ciclos.
- * Los ajustes de la versión 1 se migran solos: lo que falta toma su valor
- * por defecto en `sanitizeSettings`.
+ * 3 (app 1.6): añade el idioma. Los ajustes de versiones anteriores se
+ * migran solos: lo que falta toma su valor por defecto en `sanitizeSettings`.
  */
-export const SETTINGS_VERSION = 2;
+export const SETTINGS_VERSION = 3;
 
 export interface Settings {
   /** Versión del esquema, para migraciones futuras. */
@@ -43,6 +44,8 @@ export interface Settings {
    * para elegir el tiempo. Se cambia en el menú (1.5).
    */
   readonly haptics: boolean;
+  /** Idioma: español, inglés o automático (el del dispositivo) (1.6). */
+  readonly language: LanguagePreference;
   /** Sonido al terminar y al cambiar de fase (1.5). */
   readonly sound: boolean;
   /** Sesión única (un temporizador) o ciclos trabajo/descanso (1.5). */
@@ -64,6 +67,7 @@ export const DEFAULT_SETTINGS: Settings = Object.freeze({
   contentId: DEFAULT_CONTENT_ID,
   hourglassModelId: DEFAULT_MODEL_ID,
   theme: 'system',
+  language: 'system',
   haptics: true,
   sound: true,
   sessionMode: 'single',
@@ -92,6 +96,8 @@ export function sanitizeSettings(raw: unknown): Settings {
     hourglassModelId: getHourglassModel(typeof r.hourglassModelId === 'string' ? r.hourglassModelId : null)
       .id,
     theme,
+    // 1.6: ajustes anteriores no traen idioma → Automático.
+    language: r.language === 'es' || r.language === 'en' || r.language === 'system' ? r.language : 'system',
     // Ajustes guardados por versiones anteriores no traen `haptics`: activada.
     haptics: typeof r.haptics === 'boolean' ? r.haptics : DEFAULT_SETTINGS.haptics,
     // Novedades de la 1.5: si no vienen (ajustes de la 1.4), valores por defecto.

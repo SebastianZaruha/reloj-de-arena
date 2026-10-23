@@ -8,6 +8,7 @@
 import { Pressable, StyleSheet } from 'react-native';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 
+import { useT } from '../../i18n/I18n';
 import { useThemedBackground } from './themedStyles';
 
 interface Props {
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export function MenuButton({ top, expanded, onPress, opacity, themeProgress }: Props) {
+  const t = useT();
   const line = useThemedBackground(themeProgress, 'menuIcon');
   const fade = useAnimatedStyle(() => ({ opacity: opacity.value }));
   return (
@@ -28,8 +30,8 @@ export function MenuButton({ top, expanded, onPress, opacity, themeProgress }: P
         onPress={onPress}
         style={({ pressed }) => [styles.button, pressed && styles.pressed]}
         accessibilityRole="button"
-        accessibilityLabel="Ajustes"
-        accessibilityHint={expanded ? 'Cierra el menú de ajustes' : 'Abre el menú de ajustes'}
+        accessibilityLabel={t.settings}
+        accessibilityHint={expanded ? t.closeSettingsHint : t.openSettings}
         aria-expanded={expanded}
         testID="boton-menu"
       >

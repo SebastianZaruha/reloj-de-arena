@@ -17,10 +17,13 @@ import {
   CYCLE_LIMITS,
   CYCLE_PRESETS,
   activeCycleConfig,
+  LANGUAGE_NAMES,
   stepMinutes,
   stepRounds,
   type CycleConfig,
   type CyclePresetId,
+  type LanguagePreference,
+  type Messages,
   type SessionMode,
   type Settings,
   type ThemePreference,
@@ -39,6 +42,7 @@ import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, { Easing, useAnimatedStyle, withTiming, type SharedValue } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { useT } from '../../i18n/I18n';
 import type { HourglassTheme } from '../../theme/theme';
 import { Chip, Segmented, Stepper, ToggleRow, type SegmentOption } from './controls';
 import { useMenuStyles, type MenuFonts } from './themedStyles';
@@ -47,15 +51,22 @@ import type { SheetState } from './useSheet';
 /** Tiempos rápidos (minutos). */
 export const QUICK_TIMES_MIN = [5, 10, 15, 25, 45, 60] as const;
 
-const THEME_OPTIONS: readonly SegmentOption<ThemePreference>[] = [
-  { value: 'light', label: 'Claro' },
-  { value: 'dark', label: 'Oscuro' },
-  { value: 'system', label: 'Automático' },
+const themeOptions = (t: Messages): readonly SegmentOption<ThemePreference>[] => [
+  { value: 'light', label: t.themeLight },
+  { value: 'dark', label: t.themeDark },
+  { value: 'system', label: t.automatic },
 ];
 
-const MODE_OPTIONS: readonly SegmentOption<SessionMode>[] = [
-  { value: 'single', label: 'Sesión única' },
-  { value: 'cycles', label: 'Ciclos' },
+/** Los nombres de idioma van siempre en su propio idioma; «Automático», en el actual. */
+const languageOptions = (t: Messages): readonly SegmentOption<LanguagePreference>[] => [
+  { value: 'es', label: LANGUAGE_NAMES.es },
+  { value: 'en', label: LANGUAGE_NAMES.en },
+  { value: 'system', label: t.automatic },
+];
+
+const modeOptions = (t: Messages): readonly SegmentOption<SessionMode>[] => [
+  { value: 'single', label: t.single },
+  { value: 'cycles', label: t.cycles },
 ];
 
 /** Opacidad de la sección que no está en uso (Tiempos rápidos o Ciclos). */
@@ -91,6 +102,7 @@ export function SettingsSheet({
   safeTop,
   safeBottom,
 }: Props) {
+  const t = useT();
   const s = useMenuStyles(themeProgress);
   const base = { styles: s, fonts, pillShadow: theme.ui.pillShadow };
   const { open, visible, hide, offset, height } = sheet;
@@ -115,7 +127,7 @@ export function SettingsSheet({
   // ─── Atrás de Android ───────────────────────────────────────────────────
   useEffect(() => {
     if (!open) return;
-    AccessibilityInfo.announceForAccessibility('Ajustes');
+    AccessibilityInfo.announceForAccessibility(t.settings);
     if (Platform.OS === 'web') {
       // En la web no hay botón «atrás» del sistema: usamos la tecla Escape.
       const onKey = (e: KeyboardEvent) => {
@@ -129,6 +141,8 @@ export function SettingsSheet({
       return true; // ya lo hemos gestionado: no salir de la app
     });
     return () => sub.remove();
+    // Solo al abrir (no al cambiar de idioma con la hoja abierta).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, hide]);
 
   // ─── Arrastrar hacia abajo para cerrar ──────────────────────────────────
@@ -161,8 +175,8 @@ export function SettingsSheet({
   const cycle = activeCycleConfig(settings);
   const lastMin = Math.round(settings.lastDurationMs / MINUTE_MS);
   const summary = cycles
-    ? `Ciclos · ${cycle.workMin}/${cycle.breakMin} · ${cycle.rounds} ${cycle.rounds === 1 ? 'ronda' : 'rondas'}`
-    : `Sesión única · ${formatMinutes(lastMin)}`;
+    ? t.summaryCycles(cycle.workMin, cycle.breakMin, cycle.rounds)
+    : t.summarySingle(formatMinutes(lastMin));
 
   /** Editar un valor de ciclo pasa a «Personalizado» partiendo de lo que se ve. */
   const editCycle = (patch: Partial<CycleConfig>) =>
@@ -183,7 +197,7 @@ export function SettingsSheet({
             onPress={hide}
             style={styles.grabArea}
             accessibilityRole="button"
-            accessibilityLabel="Cerrar ajustes"
+            accessibilityLabel={t.closeSettings}
             testID="cerrar-ajustes"
           >
             <Animated.View style={[styles.grabber, s.grabberBg]} />
@@ -193,7 +207,7 @@ export function SettingsSheet({
               style={[styles.title, { fontFamily: fonts.medium }, s.ink]}
               accessibilityRole="header"
             >
-              Ajustes
+              {t.settings}
             </Animated.Text>
             <Animated.Text
               style={[styles.summary, { fontFamily: fonts.regular }, s.inkSoft]}
@@ -215,19 +229,31 @@ export function SettingsSheet({
         >
           <View onLayout={(e) => setBodyH(Math.ceil(e.nativeEvent.layout.height))} style={styles.body}>
             {/* Tema */}
-            <Section label="Tema" styles={s} fonts={fonts}>
+            <Section label={t.theme} styles={s} fonts={fonts}>
               <Segmented
                 {...base}
-                options={THEME_OPTIONS}
+                options={themeOptions(t)}
                 value={settings.theme}
                 onChange={(theme) => update({ theme })}
-                accessibilityLabel="Tema"
+                accessibilityLabel={t.theme}
+              />
+            </Section>
+
+            {/* Idioma (1.6) */}
+            <Section label={t.language} styles={s} fonts={fonts}>
+              <Segmented
+                {...base}
+                options={languageOptions(t)}
+                value={settings.language}
+                onChange={(language) => update({ language })}
+                accessibilityLabel={t.language}
+                testID="idioma"
               />
             </Section>
 
             {/* Tiempos rápidos (sesión única) */}
-            <Section label="Tiempos rápidos · min" styles={s} fonts={fonts} dimmed={cycles}>
-              <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel="Tiempos rápidos">
+            <Section label={t.quickTimesMin} styles={s} fonts={fonts} dimmed={cycles}>
+              <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel={t.quickTimes}>
                 {QUICK_TIMES_MIN.map((min) => (
                   <Chip
                     {...base}
@@ -235,7 +261,7 @@ export function SettingsSheet({
                     round
                     label={String(min)}
                     selected={!cycles && lastMin === min}
-                    accessibilityLabel={`${min} minutos`}
+                    accessibilityLabel={t.minutes(min)}
                     onPress={() => update({ sessionMode: 'single', lastDurationMs: min * MINUTE_MS })}
                     testID={`rapido-${min}`}
                   />
@@ -244,16 +270,16 @@ export function SettingsSheet({
             </Section>
 
             {/* Sesión: única o ciclos */}
-            <Section label="Sesión" styles={s} fonts={fonts}>
+            <Section label={t.session} styles={s} fonts={fonts}>
               <Segmented
                 {...base}
-                options={MODE_OPTIONS}
+                options={modeOptions(t)}
                 value={settings.sessionMode}
                 onChange={(sessionMode) => update({ sessionMode })}
-                accessibilityLabel="Tipo de sesión"
+                accessibilityLabel={t.sessionType}
               />
               <View style={[styles.cycleBlock, !cycles && styles.dimmed]}>
-                <View style={styles.presets} accessibilityRole="radiogroup" accessibilityLabel="Ciclo">
+                <View style={styles.presets} accessibilityRole="radiogroup" accessibilityLabel={t.cycle}>
                   {CYCLE_PRESETS.map((p) => (
                     <Chip
                       {...base}
@@ -261,7 +287,7 @@ export function SettingsSheet({
                       style={styles.preset}
                       label={`${p.config.workMin}/${p.config.breakMin}`}
                       selected={cycles && settings.cyclePreset === p.id}
-                      accessibilityLabel={`${p.config.workMin} minutos de trabajo y ${p.config.breakMin} de descanso`}
+                      accessibilityLabel={t.presetSpoken(p.config.workMin, p.config.breakMin)}
                       onPress={() => update({ sessionMode: 'cycles', cyclePreset: p.id })}
                       testID={`preajuste-${p.id}`}
                     />
@@ -269,9 +295,9 @@ export function SettingsSheet({
                   <Chip
                     {...base}
                     style={styles.presetCustom}
-                    label="Personalizado"
+                    label={t.custom}
                     selected={cycles && settings.cyclePreset === 'custom'}
-                    accessibilityLabel="Personalizado"
+                    accessibilityLabel={t.custom}
                     onPress={() => update({ sessionMode: 'cycles', cyclePreset: 'custom' as CyclePresetId })}
                     testID="preajuste-custom"
                   />
@@ -279,10 +305,10 @@ export function SettingsSheet({
                 <Animated.View style={[styles.steppers, s.trackBg]}>
                   <Stepper
                     {...base}
-                    label="Trabajo"
+                    label={t.work}
                     value={cycle.workMin}
                     unit="min"
-                    spoken={`${cycle.workMin} minutos`}
+                    spoken={t.minutes(cycle.workMin)}
                     canDecrement={cycle.workMin > CYCLE_LIMITS.minMinutes}
                     canIncrement={cycle.workMin < CYCLE_LIMITS.maxMinutes}
                     onStep={(d) => editCycle({ workMin: stepMinutes(cycle.workMin, d) })}
@@ -291,10 +317,10 @@ export function SettingsSheet({
                   <Animated.View style={[styles.vline, s.lineBg]} />
                   <Stepper
                     {...base}
-                    label="Descanso"
+                    label={t.break}
                     value={cycle.breakMin}
                     unit="min"
-                    spoken={`${cycle.breakMin} minutos`}
+                    spoken={t.minutes(cycle.breakMin)}
                     canDecrement={cycle.breakMin > CYCLE_LIMITS.minMinutes}
                     canIncrement={cycle.breakMin < CYCLE_LIMITS.maxMinutes}
                     onStep={(d) => editCycle({ breakMin: stepMinutes(cycle.breakMin, d) })}
@@ -303,9 +329,9 @@ export function SettingsSheet({
                   <Animated.View style={[styles.vline, s.lineBg]} />
                   <Stepper
                     {...base}
-                    label="Rondas"
+                    label={t.rounds}
                     value={cycle.rounds}
-                    spoken={`${cycle.rounds} ${cycle.rounds === 1 ? 'ronda' : 'rondas'}`}
+                    spoken={t.roundsCount(cycle.rounds)}
                     canDecrement={cycle.rounds > CYCLE_LIMITS.minRounds}
                     canIncrement={cycle.rounds < CYCLE_LIMITS.maxRounds}
                     onStep={(d) => editCycle({ rounds: stepRounds(cycle.rounds, d) })}
@@ -313,9 +339,7 @@ export function SettingsSheet({
                   />
                 </Animated.View>
                 <Animated.Text style={[styles.cycleSummary, { fontFamily: fonts.regular }, s.inkSoft]}>
-                  {`Trabajo ${cycle.workMin} min · Descanso ${cycle.breakMin} min · ${cycle.rounds} ${
-                    cycle.rounds === 1 ? 'ronda' : 'rondas'
-                  }`}
+                  {t.cycleSummary(cycle.workMin, cycle.breakMin, cycle.rounds)}
                 </Animated.Text>
               </View>
             </Section>
@@ -326,7 +350,7 @@ export function SettingsSheet({
               <ToggleRow
                 {...base}
                 style={styles.toggle}
-                label="Sonido"
+                label={t.sound}
                 value={settings.sound}
                 onChange={(sound) => update({ sound })}
                 testID="interruptor-sonido"
@@ -335,7 +359,7 @@ export function SettingsSheet({
               <ToggleRow
                 {...base}
                 style={styles.toggle}
-                label="Vibración"
+                label={t.vibration}
                 value={settings.haptics}
                 onChange={(haptics) => update({ haptics })}
                 testID="interruptor-vibracion"

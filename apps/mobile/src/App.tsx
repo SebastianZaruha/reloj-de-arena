@@ -13,6 +13,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useSettings } from './hooks/useSettings';
+import { I18nProvider } from './i18n/I18n';
 import { TimerScreen, type ScreenFonts } from './screens/TimerScreen';
 import { resolveScheme, themeFor } from './theme/theme';
 
@@ -48,7 +49,11 @@ export default function App() {
   return (
     <GestureHandlerRootView style={[styles.root, { backgroundColor: background }]}>
       <SafeAreaProvider>
-        {ready ? <TimerScreen settings={settings} fonts={fontsLoaded ? FONTS : {}} /> : null}
+        {ready ? (
+          <I18nProvider preference={settings.settings.language}>
+            <TimerScreen settings={settings} fonts={fontsLoaded ? FONTS : {}} />
+          </I18nProvider>
+        ) : null}
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

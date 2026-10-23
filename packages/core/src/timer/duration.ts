@@ -86,20 +86,41 @@ export function formatDuration(ms: number): string {
 }
 
 /**
- * Texto natural para lectores de pantalla, p. ej. "1 hora y 5 minutos".
+ * Texto natural para lectores de pantalla, p. ej. "1 hora y 5 minutos"
+ * (o, en inglés, "1 hour and 5 minutes").
  */
-export function describeDuration(ms: number): string {
+export function describeDuration(ms: number, language: 'es' | 'en' = 'es'): string {
   const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
   const s = totalSeconds % 60;
   const parts: string[] = [];
-  if (h > 0) parts.push(`${h} ${h === 1 ? 'hora' : 'horas'}`);
-  if (m > 0) parts.push(`${m} ${m === 1 ? 'minuto' : 'minutos'}`);
-  if (s > 0 || parts.length === 0) parts.push(`${s} ${s === 1 ? 'segundo' : 'segundos'}`);
+  const w = language === 'en' ? WORDS_EN : WORDS_ES;
+  if (h > 0) parts.push(`${h} ${h === 1 ? w.hour : w.hours}`);
+  if (m > 0) parts.push(`${m} ${m === 1 ? w.minute : w.minutes}`);
+  if (s > 0 || parts.length === 0) parts.push(`${s} ${s === 1 ? w.second : w.seconds}`);
   if (parts.length === 1) return parts[0] as string;
-  return `${parts.slice(0, -1).join(', ')} y ${parts[parts.length - 1]}`;
+  return `${parts.slice(0, -1).join(', ')} ${w.and} ${parts[parts.length - 1]}`;
 }
+
+const WORDS_ES = {
+  hour: 'hora',
+  hours: 'horas',
+  minute: 'minuto',
+  minutes: 'minutos',
+  second: 'segundo',
+  seconds: 'segundos',
+  and: 'y',
+};
+const WORDS_EN: typeof WORDS_ES = {
+  hour: 'hour',
+  hours: 'hours',
+  minute: 'minute',
+  minutes: 'minutes',
+  second: 'second',
+  seconds: 'seconds',
+  and: 'and',
+};
 
 function range(from: number, to: number, step: number): number[] {
   const out: number[] = [];

@@ -14,3 +14,4 @@ export * from './physics';
 export * from './sim';
 export * from './persistence';
 export * from './recovery';
+export * from './i18n';

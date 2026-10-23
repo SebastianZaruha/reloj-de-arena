@@ -29,7 +29,6 @@
  * desliza arriba/abajo para cambiar el tiempo y doble toque para empezar.
  */
 import {
-  describeDuration,
   durationFromDrag,
   flipHaptic,
   formatDuration,
@@ -46,6 +45,7 @@ import {
   StepTicker,
   stepToDuration,
   type OrientationEvent,
+  type Messages,
   type SessionSnapshot,
 } from '@reloj/core';
 import { StatusBar } from 'expo-status-bar';
@@ -84,6 +84,7 @@ import { useLatest } from '../hooks/useLatest';
 import { useSession } from '../hooks/useSession';
 import type { UseSettings } from '../hooks/useSettings';
 import { useIntro } from '../intro/useIntro';
+import { useT } from '../i18n/I18n';
 import { useDeviceTilt } from '../motion/useDeviceTilt';
 import { saveSessionAndReload } from '../recovery/sessionRecovery';
 import { useCueSound } from '../sound/useCueSound';
@@ -117,6 +118,7 @@ export function TimerScreen({ settings, fonts }: Props) {
   const { width, height } = useWindowDimensions();
   const safe = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
+  const tr = useT();
 
   // Tema efectivo (Claro / Oscuro / Automático) con transición suave.
   const { theme, progress: themeProgress } = useAppTheme(prefs.theme, reduceMotion);
@@ -158,11 +160,11 @@ export function TimerScreen({ settings, fonts }: Props) {
     if (cue === 'phase-change') {
       playCue(cue);
       playTimerHaptic('phase');
-      AccessibilityInfo.announceForAccessibility(phaseSpoken(view));
+      AccessibilityInfo.announceForAccessibility(phaseSpoken(view, tr));
     } else if (cue === 'finished') {
       // La vibración de éxito la pone useTimerHaptics (running → finished).
       playCue(cue);
-      AccessibilityInfo.announceForAccessibility(view.isCycle ? 'Ciclos terminados' : 'Tiempo terminado');
+      AccessibilityInfo.announceForAccessibility(view.isCycle ? tr.cyclesDone : tr.timeUp);
     }
     // Solo cuando cambia el estado o la fase (no en cada refresco del texto).
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -300,7 +302,7 @@ export function TimerScreen({ settings, fonts }: Props) {
         if (next !== current) playSelectionTick();
         previewDuration(next);
         commitDuration(next);
-        AccessibilityInfo.announceForAccessibility(describeDuration(next));
+        AccessibilityInfo.announceForAccessibility(tr.duration(next));
         break;
       }
       case 'activate':
@@ -319,8 +321,8 @@ export function TimerScreen({ settings, fonts }: Props) {
     [safe.top, safe.bottom],
   );
   const displayMs = view.status === 'idle' ? view.durationMs : view.remainingMs;
-  const hint = blurred ? null : hintFor(view, interacted);
-  const label = view.isCycle && view.status !== 'finished' && !blurred ? phaseLabel(view) : null;
+  const hint = blurred ? null : hintFor(view, interacted, tr);
+  const label = view.isCycle && view.status !== 'finished' && !blurred ? phaseLabel(view, tr) : null;
   // Volteado: el texto y el menú giran con el reloj para leerse derechos.
   const overlayStyle = tilt.flipped ? styles.flipped : null;
   const timeFonts = useMemo(() => ({ time: fonts.time, hint: fonts.hint, label: fonts.medium }), [fonts]);
@@ -334,14 +336,14 @@ export function TimerScreen({ settings, fonts }: Props) {
           style={StyleSheet.absoluteFill}
           accessible
           accessibilityRole="adjustable"
-          accessibilityLabel="Reloj de arena"
-          aria-valuetext={accessibilityValue(view)}
-          accessibilityHint="Desliza hacia arriba o hacia abajo para cambiar el tiempo. Toca dos veces para empezar o pausar."
+          accessibilityLabel={tr.hourglass}
+          aria-valuetext={accessibilityValue(view, tr)}
+          accessibilityHint={tr.hourglassHint}
           accessibilityActions={[
-            { name: 'increment', label: 'Más tiempo' },
-            { name: 'decrement', label: 'Menos tiempo' },
-            { name: 'activate', label: view.status === 'running' ? 'Pausar' : 'Empezar' },
-            { name: 'longpress', label: 'Reiniciar' },
+            { name: 'increment', label: tr.moreTime },
+            { name: 'decrement', label: tr.lessTime },
+            { name: 'activate', label: view.status === 'running' ? tr.pause : tr.start },
+            { name: 'longpress', label: tr.restart },
           ]}
           onAccessibilityAction={onAccessibilityAction}
           // Con el menú abierto, el lector de pantalla solo ve el menú.
@@ -386,7 +388,7 @@ export function TimerScreen({ settings, fonts }: Props) {
           sideSign={blurred ? tilt.sideSign : 0}
           theme={theme}
           font={fonts.time}
-          text="Pausa"
+          text={tr.paused}
           reduceMotion={reduceMotion}
         />
         <TimeDisplay
@@ -438,40 +440,40 @@ export function TimerScreen({ settings, fonts }: Props) {
   );
 }
 
-/** «Trabajo 2/4» / «Descanso 2/4». */
-function phaseLabel(view: SessionSnapshot): string {
-  return `${view.kind === 'focus' ? 'Trabajo' : 'Descanso'} ${view.round}/${view.rounds}`;
+/** «Trabajo 2/4» / «Work 2/4». */
+function phaseLabel(view: SessionSnapshot, tr: Messages): string {
+  return tr.phaseLabel(view.kind, view.round, view.rounds);
 }
 
 /** «Descanso, ronda 2 de 4» (para el lector de pantalla). */
-function phaseSpoken(view: SessionSnapshot): string {
-  return `${view.kind === 'focus' ? 'Trabajo' : 'Descanso'}, ronda ${view.round} de ${view.rounds}`;
+function phaseSpoken(view: SessionSnapshot, tr: Messages): string {
+  return tr.phaseSpoken(view.kind, view.round, view.rounds);
 }
 
-function hintFor(view: SessionSnapshot, interacted: boolean): string | null {
+function hintFor(view: SessionSnapshot, interacted: boolean, tr: Messages): string | null {
   switch (view.status) {
     case 'idle':
-      return interacted ? null : 'desliza para elegir · toca para empezar';
+      return interacted ? null : tr.hintIdle;
     case 'paused':
-      return 'mantén pulsado para reiniciar';
+      return tr.hintPaused;
     case 'finished':
-      return view.isCycle ? 'ciclos completados · toca para empezar' : 'toca para volver a empezar';
+      return view.isCycle ? tr.hintCyclesFinished : tr.hintFinished;
     default:
       return null;
   }
 }
 
-function accessibilityValue(view: SessionSnapshot): string {
-  const phase = view.isCycle ? `${phaseSpoken(view)}. ` : '';
+function accessibilityValue(view: SessionSnapshot, tr: Messages): string {
+  const phase = view.isCycle ? `${phaseSpoken(view, tr)}. ` : '';
   switch (view.status) {
     case 'idle':
-      return `${phase}${describeDuration(view.durationMs)}. Listo para empezar`;
+      return `${phase}${tr.readyToStart(tr.duration(view.durationMs))}`;
     case 'running':
-      return `${phase}Quedan ${describeDuration(view.remainingMs)}`;
+      return `${phase}${tr.remaining(tr.duration(view.remainingMs))}`;
     case 'paused':
-      return `${phase}En pausa. Quedan ${describeDuration(view.remainingMs)}`;
+      return `${phase}${tr.pausedRemaining(tr.duration(view.remainingMs))}`;
     case 'finished':
-      return view.isCycle ? 'Ciclos terminados' : 'Tiempo terminado';
+      return view.isCycle ? tr.cyclesDone : tr.timeUp;
   }
 }
 

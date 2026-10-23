@@ -10,6 +10,7 @@ import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'rea
 import Animated from 'react-native-reanimated';
 
 import type { MenuFonts, MenuStyles } from './themedStyles';
+import { useT } from '../../i18n/I18n';
 
 interface Base {
   readonly styles: MenuStyles;
@@ -31,6 +32,8 @@ interface SegmentedProps<T extends string> extends Base {
   readonly onChange: (value: T) => void;
   /** Nombre del grupo para el lector de pantalla («Tema»). */
   readonly accessibilityLabel: string;
+  /** Prefijo de los testID de cada opción (por defecto «opcion»). */
+  readonly testID?: string;
 }
 
 export function Segmented<T extends string>({
@@ -38,6 +41,7 @@ export function Segmented<T extends string>({
   value,
   onChange,
   accessibilityLabel,
+  testID = 'opcion',
   styles: s,
   fonts,
   pillShadow,
@@ -59,7 +63,7 @@ export function Segmented<T extends string>({
             accessibilityRole="radio"
             aria-checked={on}
             accessibilityLabel={o.label}
-            testID={`opcion-${o.value}`}
+            testID={`${testID}-${o.value}`}
           >
             <Animated.View style={[st.segPill, on ? s.pillBg : s.clearBg, on && { boxShadow: pillShadow }]}>
               <Animated.Text
@@ -198,6 +202,7 @@ export function Stepper({
   fonts,
   testID,
 }: StepperProps) {
+  const t = useT();
   return (
     <View
       style={st.stepper}
@@ -207,8 +212,8 @@ export function Stepper({
       aria-valuetext={spoken}
       aria-valuenow={value}
       accessibilityActions={[
-        { name: 'increment', label: 'Más' },
-        { name: 'decrement', label: 'Menos' },
+        { name: 'increment', label: t.more },
+        { name: 'decrement', label: t.less },
       ]}
       onAccessibilityAction={(e) => onStep(e.nativeEvent.actionName === 'increment' ? 1 : -1)}
       testID={testID}

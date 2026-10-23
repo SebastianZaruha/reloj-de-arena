@@ -55,8 +55,9 @@ describe('ajustes', () => {
     const old = { version: 1, lastDurationMs: 15 * MIN, theme: 'dark', haptics: false, updatedAt: 5 };
     const s = sanitizeSettings(old);
     expect(s).toMatchObject({
-      version: 2,
+      version: 3,
       lastDurationMs: 15 * MIN,
+      language: 'system',
       theme: 'dark',
       haptics: false,
       sound: true,
