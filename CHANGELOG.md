@@ -9,6 +9,62 @@ funcionamiento interno en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md).
 > APK de desarrollo. A partir de la publicación en GitHub basta con `git pull`; las
 > instrucciones «Cómo actualizar» se conservan como referencia.
 
+## 1.7.0 — Notificación y avisos con la app cerrada (Android)
+
+Primera parte de la fase 4: en Android el reloj **sigue contando en segundo plano y con la app
+cerrada**. Una notificación fija muestra la cuenta atrás y la fase («Trabajo 1/4»), con los
+botones **Pausar / Reanudar** y **Reiniciar**, y los cambios de fase y el final suenan y vibran
+como dentro de la app. Cómo está hecho y por qué, en
+[docs/SEGUNDO_PLANO.md](docs/SEGUNDO_PLANO.md). **Hay código nativo nuevo: hace falta APK
+nuevo.**
+
+### Cómo actualizar desde la 1.6
+
+1. `git pull`.
+2. **No hace falta `npm install`** (no hay dependencias nuevas: el módulo es local, en
+   `apps/mobile/modules/background-timer/`).
+3. **APK nuevo:** `cd apps/mobile`, `npx expo prebuild --platform android --clean` (el
+   `--clean` regenera `android/` con el módulo, los permisos y los sonidos) y compílalo como
+   siempre (ver README). El APK de la 1.3 sigue abriendo la app, pero sin notificación.
+4. Instálalo y abre la app. Tus ajustes se migran solos (versión 4).
+5. **En el móvil:**
+   - Al empezar el primer reloj, la app explica para qué quiere las notificaciones y Android
+     pregunta: **Permitir**. Si dices que no, el menú muestra un aviso que abre los ajustes.
+   - Android 12: si quitaste «Alarmas y recordatorios», el menú también lo avisa (sin él los
+     avisos pueden llegar unos minutos tarde). En Android 13+ no hay que hacer nada.
+   - Xiaomi, Huawei, Oppo, Vivo y algunos Samsung: en los ajustes de la app, activa el
+     **inicio automático** y pon la batería en **Sin restricciones**; si no, el sistema puede
+     borrar las alarmas.
+
+### Novedades
+
+| Qué                       | Cómo                                                                                                                                                                                        | Dónde                                     |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| Notificación fija         | Cuenta atrás que pinta Android (`setChronometerCountDown`), fase y ronda, «hasta las 10:25». En pausa: «Quedan 12:03». Desaparece al terminar o al reiniciar desde la app.                  | `modules/background-timer/` (Kotlin)      |
+| Botones                   | **Pausar / Reanudar** y **Reiniciar** funcionan con la app cerrada; al abrirla, la app adopta lo que hiciste (`seq`).                                                                       | `ActionReceiver.kt`, `useBackgroundTimer` |
+| Avisos con la app cerrada | Una alarma exacta por cada cambio de fase y el fin, calculadas por el core. Se recalculan al pausar, reiniciar, voltear o cambiar el plan, y tras reiniciar el móvil.                       | `core/src/background/`, `TimerAlarms.kt`  |
+| Sonido y vibración        | `cambio.mp3` / `fin.mp3` y los mismos patrones de la app (doble en el cambio de fase). Respetan los interruptores del menú (un canal por combinación; en silencio si ambos están apagados). | `TimerNotifications.kt`, `app.plugin.js`  |
+| Sin avisos dobles         | Con la app a la vista avisa la app; en segundo plano, la notificación. Al volver no se repiten.                                                                                             | `background/visibility.ts`                |
+| Permisos                  | Se pide el permiso de notificaciones una vez, explicado, en español o inglés; aviso en el menú si falta un permiso.                                                                         | `useBackgroundTimer`, `SettingsSheet`     |
+
+### Decisiones tomadas (se pueden cambiar)
+
+- **«Reiniciar» en la notificación vuelve a la ronda 1 y sigue contando** (la pulsación larga
+  en la app sigue dejándolo listo para empezar).
+- **Sin servicio en primer plano:** el cronómetro lo pinta Android y las alarmas despiertan la
+  app; gasta menos y evita las restricciones de Android 14.
+- **Avisos atrasados más de 15 min** (móvil apagado, «Forzar detención») no se dan.
+- La ventana flotante (parte 2) queda para la siguiente entrega; el estado nativo ya está
+  pensado para que la use.
+
+### Pruebas
+
+- Core: **182 tests** en 21 archivos (22 nuevos de los avisos en segundo plano, incluida la
+  equivalencia con el motor de sesiones). Módulo Kotlin: **8 tests JUnit**.
+- `npm run check` limpio; ciclo completo en la web (sin el módulo) sin errores.
+- APK de desarrollo arm64 compilado (versión 1.7.0, 56 MB): permisos, receptores y sonidos
+  comprobados en el APK. **Falta probarlo en el móvil** (no hubo emulador).
+
 ## 1.6.0 — Inglés, ayuda de gestos y arena más natural
 
 Una entrega de pulido tras probar la 1.5 en el móvil: la app habla **inglés** (con selector),
