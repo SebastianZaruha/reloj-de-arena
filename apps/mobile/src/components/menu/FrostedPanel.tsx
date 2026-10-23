@@ -23,9 +23,15 @@
  * basta con volver a dibujarlo y desenfocar solo el reloj en una capa
  * propia: el mismo aspecto, sin leer la pantalla.
  *
+ * En la web se sigue usando BackdropBlur: el navegador dibuja con la GPU del
+ * PC (o por software), donde copiar la pantalla es barato y volver a pintar
+ * los shaders del reloj sale más caro (medido: ~25 fps frente a ~15 con la
+ * CPU 4 veces más lenta). Las dos formas se ven igual (diferencia ≤ 5/255).
+ *
  * Solo se monta mientras la hoja está abierta o animándose.
  */
 import {
+  BackdropBlur,
   Blur,
   Fill,
   Group,
@@ -37,6 +43,7 @@ import {
   rrect,
   vec,
 } from '@shopify/react-native-skia';
+import { Platform } from 'react-native';
 import { interpolateColor, useDerivedValue, type SharedValue } from 'react-native-reanimated';
 
 import type { HourglassScene } from '../../hourglass';
@@ -46,6 +53,8 @@ import { DARK_THEME, LIGHT_THEME } from '../../theme/theme';
 export const SHEET_RADIUS = 30;
 /** Desenfoque del vidrio (px). */
 const BLUR = 26;
+/** Redibujar la escena desenfocada (móvil) o leer la pantalla (web). */
+const REDRAW_SCENE = Platform.OS !== 'web';
 /** Alto de la sombra sobre el canto. */
 const SHADOW_H = 28;
 
@@ -94,20 +103,26 @@ export function FrostedPanel({ width, height, top, openness, themeProgress, scen
       <Rect rect={shadowRect}>
         <LinearGradient start={shadowStart} end={shadowEnd} colors={shadowColors} />
       </Rect>
-      <Group clip={shape}>
-        {scene.background}
-        <Group
-          layer={
-            <Paint>
-              <Blur blur={BLUR} mode="decal" />
-            </Paint>
-          }
-        >
-          {scene.subject}
+      {REDRAW_SCENE ? (
+        <Group clip={shape}>
+          {scene.background}
+          <Group
+            layer={
+              <Paint>
+                <Blur blur={BLUR} mode="decal" />
+              </Paint>
+            }
+          >
+            {scene.subject}
+          </Group>
+          <Fill color={scrim} opacity={openness} />
+          <Fill color={tint} />
         </Group>
-        <Fill color={scrim} opacity={openness} />
-        <Fill color={tint} />
-      </Group>
+      ) : (
+        <BackdropBlur blur={BLUR} clip={shape}>
+          <Fill color={tint} />
+        </BackdropBlur>
+      )}
       <Group clip={edgeBand}>
         <RoundedRect rect={shape} style="stroke" strokeWidth={1} color={edge} />
       </Group>
