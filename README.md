@@ -58,7 +58,8 @@ sale sola la primera vez y se abre con el «?» del menú.
 | **Expo SDK 58 + React Native 0.88** (TypeScript) | Una sola base de código para Android, iOS y web; _development build_ propio sin depender de Expo Go.                                           |
 | **@shopify/react-native-skia** (shaders SkSL)    | Dibujo por GPU con shaders: vidrio y arena realistas a 60 fps. En web usa **CanvasKit** (Skia en WebAssembly).                                 |
 | **Reanimated 4 + Gesture Handler 3**             | La arena se publica en _shared values_: el lienzo se redibuja sin re-renderizar React. Gestos nativos fluidos.                                 |
-| **expo-sensors · expo-haptics · expo-audio**     | Acelerómetro (inclinación, pausa, volteo), vibración y sonido, sin código nativo propio.                                                       |
+| **expo-sensors · expo-haptics · expo-audio**     | Acelerómetro (inclinación, pausa, volteo), vibración y sonido.                                                                                 |
+| **Módulo local de Expo en Kotlin** (1.7)         | Notificación con cuenta atrás nativa y avisos con la app cerrada (alarmas exactas). Ver [docs/SEGUNDO_PLANO.md](docs/SEGUNDO_PLANO.md).        |
 | **Núcleo en TypeScript puro** (`@reloj/core`)    | Temporizador, simulación, física y ajustes sin React ni UI: se prueba con **Vitest** en milisegundos y se reutilizará en la app de escritorio. |
 | **npm workspaces** (monorepo)                    | Funciona sin configuración extra con Metro/Expo en Windows.                                                                                    |
 | **ESLint + Prettier + TypeScript estricto**      | Un solo comando (`npm run check`) valida tipos, estilo, formato y tests.                                                                       |
@@ -137,8 +138,9 @@ Windows puede preguntar si Node.js puede usar la red: acepta en **redes privadas
 
 > **Por qué un _development build_ y no Expo Go:** es «tu propio Expo Go», con los módulos
 > nativos exactos del proyecto, y no depende de qué versión de Expo Go tenga la Play Store.
-> Como el proyecto solo usa módulos incluidos en Expo Go, también funciona con **Expo Go 58**
-> (`npx expo-go download android 58`, y en la terminal pulsa `s` para cambiar a Expo Go).
+> También funciona con **Expo Go 58** (`npx expo-go download android 58`, y en la terminal
+> pulsa `s` para cambiar a Expo Go), pero **sin notificación ni avisos en segundo plano**: el
+> módulo nativo propio de la 1.7 solo está en el _development build_.
 
 ### Compilar el APK de desarrollo
 
@@ -148,7 +150,7 @@ TypeScript se cargan desde el PC sin APK nuevo). La carpeta `android/` se **gene
 
 ```bash
 cd apps/mobile
-npx expo prebuild --platform android
+npx expo prebuild --platform android --clean
 cd android
 ./gradlew assembleDebug -PreactNativeArchitectures=arm64-v8a
 # APK: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
@@ -161,9 +163,12 @@ Si Gradle se queda sin memoria, añade `-Dorg.gradle.jvmargs=-Xmx3g`.
 
 Para instalarlo: copia el APK al móvil, ábrelo y permite **instalar apps de orígenes
 desconocidos**. Está firmado con la clave de depuración estándar, así que Play Protect puede
-avisar (_Instalar de todas formas_). **No pide permisos peligrosos:** el permiso de actividad
-física que añade `expo-sensors` está bloqueado en `app.json` (`blockedPermissions`), así que
-cualquier `prebuild` lo quita automáticamente.
+avisar (_Instalar de todas formas_). El permiso de actividad física que añade `expo-sensors`
+está bloqueado en `app.json` (`blockedPermissions`), así que cualquier `prebuild` lo quita.
+Desde la 1.7 pide **mostrar notificaciones** (Android 13+, la primera vez que empieza un reloj)
+y usa **alarmas exactas** para avisar con la app cerrada (ver
+[docs/SEGUNDO_PLANO.md](docs/SEGUNDO_PLANO.md)). `expo-audio` declara además el micrófono
+(`RECORD_AUDIO`), que la app no usa ni pide.
 
 ### Simular la inclinación en el navegador
 
@@ -195,13 +200,15 @@ npm test             # solo los tests (Vitest, paquete core)
 npm run test:coverage
 ```
 
-El núcleo (`packages/core`) tiene **159 tests** en 20 archivos: temporizador (incluidos casos
+El núcleo (`packages/core`) tiene **182 tests** en 21 archivos: temporizador (incluidos casos
 extremos del final de la cuenta y entradas NaN/Infinity), duraciones, avisos, vibración,
 ajustes (y su migración), ciclos y motor de sesiones (fases encadenadas sin perder ni un
 milisegundo, pausa, volteo, guardado), geometría y zona del botón del menú, simulación de
 arena (avalanchas, volteo, aterrizaje, vaciado en embudo, flujo tras dar la vuelta), chorro de
 granos a cualquier fps, textos en español e inglés (mismas claves), filtro del acelerómetro y
-máquina de estados de pausa/volteo.
+máquina de estados de pausa/volteo, y los avisos en segundo plano (alarmas, pausar/reanudar/
+reiniciar desde la notificación, igual que el motor de sesiones). El módulo Kotlin tiene 8 tests
+JUnit propios (`cd apps/mobile/android && ./gradlew :background-timer:testDebugUnitTest`).
 La app se comprueba con tipos, ESLint (incluido React Compiler), pruebas de extremo a extremo
 en la web con Playwright y pruebas manuales en Android (ver [CHANGELOG](CHANGELOG.md)).
 

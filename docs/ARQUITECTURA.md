@@ -23,12 +23,13 @@ versión, el [CHANGELOG](../CHANGELOG.md).
 14. [Entrada animada (1.5)](#12-entrada-animada)
 15. [Idiomas: español e inglés (1.6)](#13-idiomas-español-e-inglés)
 16. [Gestos: ayuda y zona del botón del menú (1.6)](#14-gestos-ayuda-y-zona-del-botón-del-menú)
-17. [Simulador de inclinación en el navegador](#simulador-de-inclinación-en-el-navegador)
-18. [Personalizar colores (fondo claro)](#personalizar-colores-fondo-claro)
-19. [Decisiones clave y por qué](#decisiones-clave-y-por-qué)
-20. [Accesibilidad](#accesibilidad)
-21. [Limitaciones conocidas](#limitaciones-conocidas)
-22. [Scripts](#scripts)
+17. [Segundo plano en Android (1.7)](#15-segundo-plano-en-android)
+18. [Simulador de inclinación en el navegador](#simulador-de-inclinación-en-el-navegador)
+19. [Personalizar colores (fondo claro)](#personalizar-colores-fondo-claro)
+20. [Decisiones clave y por qué](#decisiones-clave-y-por-qué)
+21. [Accesibilidad](#accesibilidad)
+22. [Limitaciones conocidas](#limitaciones-conocidas)
+23. [Scripts](#scripts)
 
 ## Estructura del monorepo
 
@@ -45,6 +46,7 @@ reloj-de-arena/
 ├── README.md · CHANGELOG.md · LICENSE · THIRD_PARTY_NOTICES.md
 ├── docs/
 │   ├── ARQUITECTURA.md     ← este documento
+│   ├── SEGUNDO_PLANO.md    ← notificación y avisos con la app cerrada (Android, 1.7)
 │   └── capturas/           ← capturas de pantalla
 │
 ├── packages/
@@ -59,14 +61,16 @@ reloj-de-arena/
 │       │   ├── i18n/       ← textos en español e inglés (diccionarios tipados) e idioma automático
 │       │   ├── physics/    ← vectores 2D, filtro del acelerómetro, pausa/volteo
 │       │   ├── sim/        ← simulación granular de la arena + controlador de flujo
-│       │   └── persistence/← interfaces de almacenamiento + implementación local
-│       └── test/           ← tests de Vitest (159 tests)
+│       │   ├── persistence/← interfaces de almacenamiento + implementación local
+│       │   └── background/ ← sesión mínima para Android, avisos futuros y textos de la notificación
+│       └── test/           ← tests de Vitest (182 tests)
 │
 └── apps/
     └── mobile/             ← @reloj/mobile: la app Expo / React Native
         ├── index.ts        ← entrada de Expo → src/bootstrap(.web).ts
         ├── app.json        ← configuración de Expo (nombre, paquete Android, tema, web…)
         ├── assets/sounds/  ← fin.mp3 (aviso al terminar) y cambio.mp3 (cambio de fase)
+        ├── modules/background-timer/ ← MÓDULO NATIVO PROPIO (Kotlin): notificación, alarmas, botones
         ├── public/         ← canvaskit.wasm para la web (lo copia npm install; no se versiona)
         └── src/
             ├── App.tsx             ← proveedores (gestos, safe area), fuentes, ajustes y fondo según el tema
@@ -91,6 +95,7 @@ reloj-de-arena/
             ├── components/PauseLabel.tsx ← rótulo «Pausa» (al tumbar el móvil o al tocar)
             ├── components/GesturesHelp.tsx ← pantalla de ayuda «Gestos» (sección 14)
             ├── i18n/I18n.tsx       ← idioma de la app: proveedor y useT() (sección 13)
+            ├── background/         ← enlace con el módulo nativo: useBackgroundTimer, sync, ¿avisa la app?
             ├── recovery/           ← guardar/recuperar la cuenta si hay que recargar (web)
             ├── storage/            ← adaptador AsyncStorage → interfaz del core
             ├── theme/theme.ts      ← paletas clara y oscura (también las del menú) y resolveScheme
@@ -451,6 +456,20 @@ con un fundido al final.
   transparente a los toques, con los toques llegando al reloj como en Android).
 - **Deslizar solo con un dedo** (`maxPointers: 1`): con dos dedos no pasa nada.
 
+## 15. Segundo plano en Android
+
+Con la app en segundo plano o cerrada, Android sigue mostrando la cuenta atrás en una
+notificación fija (con **Pausar/Reanudar** y **Reiniciar**) y da los avisos de cambio de fase
+y de fin con sonido y vibración. El **core** (`packages/core/src/background/`) traduce la
+sesión a un modelo mínimo y calcula todos los avisos futuros por marcas de tiempo; un
+**módulo local de Expo en Kotlin** (`apps/mobile/modules/background-timer/`) los programa
+como alarmas exactas y pinta el cronómetro nativo. `useBackgroundTimer` envía cada cambio de
+la sesión y, al volver, adopta lo que se haya hecho desde la notificación (número de
+secuencia `seq`). Mientras la app está a la vista, avisa la app y la notificación calla.
+
+Todo el detalle (por qué no `expo-notifications`, canales, permisos, límites) está en
+[SEGUNDO_PLANO.md](SEGUNDO_PLANO.md).
+
 ## Simulador de inclinación en el navegador
 
 Con `npm run web` (modo desarrollo) — o en cualquier versión web añadiendo `?inclinar` a la
@@ -507,24 +526,25 @@ Los demás colores (texto del tiempo, rótulo «Pausa», vidrio, sombra, arena) 
 
 ## Decisiones clave y por qué
 
-| Decisión                                                              | Por qué                                                                                                                                                                              |
-| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **npm workspaces** (no pnpm)                                          | Funciona sin configuración extra con Metro/Expo en Windows; pnpm necesita ajustes de enlaces simbólicos.                                                                             |
-| **Core en TypeScript puro**                                           | Testeable con Vitest en milisegundos; reutilizable en escritorio.                                                                                                                    |
-| **Tiempo por marcas de tiempo**                                       | Exacto aunque la app se suspenda; sin deriva acumulada.                                                                                                                              |
-| **Autómata celular** para la arena                                    | Comportamiento granular creíble (montón, cráter, reacción a la gravedad) con coste bajo en JS.                                                                                       |
-| **Cuello controlado por el temporizador**                             | La física es bonita, pero la verdad la marca el reloj: nunca se desincronizan.                                                                                                       |
-| **2.5D con shaders**, no 3D                                           | Aspecto de vidrio realista a 60 fps en gama media. El modelo está tras un catálogo (`renderer: '2.5d' \| '3d'`) para poder cambiarlo.                                                |
-| **Movimiento como fuente de datos (`MotionSource`)**                  | La simulación y los shaders leen gravedad e inclinación de un objeto que el sensor actualiza; React solo se entera de los eventos (pausa, volteo), así el sensor no provoca renders. |
-| **SkPicture + shared value**                                          | Evita renders de React a 60 fps.                                                                                                                                                     |
-| **CanvasKit en web**                                                  | Permite iterar el diseño en el navegador y prepara la versión de escritorio (Tauri mostrará la web).                                                                                 |
-| **Persistencia tras interfaces** (`KeyValueStorage`, `SettingsStore`) | Hoy AsyncStorage; mañana sincronización entre dispositivos sin tocar la UI. Los ajustes llevan `updatedAt` para resolver conflictos.                                                 |
-| **Development build** (`expo-dev-client`) + compatible con Expo Go    | No dependemos de la versión de Expo Go de la Play Store, y no usamos módulos nativos propios, así que Expo Go 58 sigue sirviendo.                                                    |
-| **Objetos Skia con dueño y liberación diferida**                      | En web CanvasKit vive en memoria WASM que el recolector no ve: todo objeto Skia se libera, pero solo cuando el lienzo ya no lo usa.                                                  |
-| **Sesión = plan de fases** en el core (1.5)                           | Ciclos y sesión única son lo mismo con distinto plan: una sola lógica, pura y con tests. Las fases se encadenan por marcas de tiempo, sin deriva.                                    |
-| **Vidrio del menú con Skia** (`BackdropBlur`) (1.5)                   | Desenfoque real sin añadir un módulo nativo (no hace falta APK nuevo) y funciona igual en la web.                                                                                    |
-| **Sin descanso tras la última ronda** (1.5)                           | Al acabar el último trabajo, la sesión ha terminado: un descanso final solo retrasaría el aviso de fin. Se puede cambiar con `FINAL_BREAK`.                                          |
-| **Cambiar el plan reinicia la sesión** (1.5)                          | Si cambias de ciclo a mitad, la sesión vuelve a «lista para empezar» con el plan nuevo: es lo más predecible.                                                                        |
+| Decisión                                                              | Por qué                                                                                                                                                                               |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **npm workspaces** (no pnpm)                                          | Funciona sin configuración extra con Metro/Expo en Windows; pnpm necesita ajustes de enlaces simbólicos.                                                                              |
+| **Core en TypeScript puro**                                           | Testeable con Vitest en milisegundos; reutilizable en escritorio.                                                                                                                     |
+| **Tiempo por marcas de tiempo**                                       | Exacto aunque la app se suspenda; sin deriva acumulada.                                                                                                                               |
+| **Autómata celular** para la arena                                    | Comportamiento granular creíble (montón, cráter, reacción a la gravedad) con coste bajo en JS.                                                                                        |
+| **Cuello controlado por el temporizador**                             | La física es bonita, pero la verdad la marca el reloj: nunca se desincronizan.                                                                                                        |
+| **2.5D con shaders**, no 3D                                           | Aspecto de vidrio realista a 60 fps en gama media. El modelo está tras un catálogo (`renderer: '2.5d' \| '3d'`) para poder cambiarlo.                                                 |
+| **Movimiento como fuente de datos (`MotionSource`)**                  | La simulación y los shaders leen gravedad e inclinación de un objeto que el sensor actualiza; React solo se entera de los eventos (pausa, volteo), así el sensor no provoca renders.  |
+| **SkPicture + shared value**                                          | Evita renders de React a 60 fps.                                                                                                                                                      |
+| **CanvasKit en web**                                                  | Permite iterar el diseño en el navegador y prepara la versión de escritorio (Tauri mostrará la web).                                                                                  |
+| **Persistencia tras interfaces** (`KeyValueStorage`, `SettingsStore`) | Hoy AsyncStorage; mañana sincronización entre dispositivos sin tocar la UI. Los ajustes llevan `updatedAt` para resolver conflictos.                                                  |
+| **Development build** (`expo-dev-client`) + compatible con Expo Go    | No dependemos de la versión de Expo Go de la Play Store. Desde la 1.7 hay un módulo nativo propio; en Expo Go no existe y la app funciona sin notificación.                           |
+| **Módulo local en Kotlin** para segundo plano (1.7)                   | `expo-notifications` no tiene cuenta atrás nativa ni botones que funcionen sin JavaScript. El core calcula los avisos y Kotlin los ejecuta. Ver [SEGUNDO_PLANO.md](SEGUNDO_PLANO.md). |
+| **Objetos Skia con dueño y liberación diferida**                      | En web CanvasKit vive en memoria WASM que el recolector no ve: todo objeto Skia se libera, pero solo cuando el lienzo ya no lo usa.                                                   |
+| **Sesión = plan de fases** en el core (1.5)                           | Ciclos y sesión única son lo mismo con distinto plan: una sola lógica, pura y con tests. Las fases se encadenan por marcas de tiempo, sin deriva.                                     |
+| **Vidrio del menú con Skia** (`BackdropBlur`) (1.5)                   | Desenfoque real sin añadir un módulo nativo (no hace falta APK nuevo) y funciona igual en la web.                                                                                     |
+| **Sin descanso tras la última ronda** (1.5)                           | Al acabar el último trabajo, la sesión ha terminado: un descanso final solo retrasaría el aviso de fin. Se puede cambiar con `FINAL_BREAK`.                                           |
+| **Cambiar el plan reinicia la sesión** (1.5)                          | Si cambias de ciclo a mitad, la sesión vuelve a «lista para empezar» con el plan nuevo: es lo más predecible.                                                                         |
 
 ## Accesibilidad
 
@@ -547,12 +567,11 @@ Los demás colores (texto del tiempo, rótulo «Pausa», vidrio, sombra, arena) 
 
 ## Limitaciones conocidas
 
-- Si se cierra la app del todo (no solo en segundo plano), la cuenta en curso se pierde; solo
-  se recuerda la última duración. En web sí se conserva si la página tiene que recargarse por
-  un fallo gráfico.
+- En Android, desde la 1.7, la cuenta sigue con la app cerrada (notificación y avisos) y al
+  abrirla se retoma. En iOS y en la web, si se cierra la app del todo la cuenta se pierde
+  (en web se conserva si la página se recarga por un fallo gráfico). Límites de Android
+  (fabricantes que matan apps, «Forzar detención»…) en [SEGUNDO_PLANO.md](SEGUNDO_PLANO.md).
 - Inclinar hacia delante/atrás solo mueve la luz, no la arena.
-- Los ciclos solo avanzan con la app abierta o en segundo plano reciente: no hay
-  notificaciones todavía (fase de notificaciones). Al volver, se ponen al día al instante.
 - En la web el desenfoque del menú lo hace CanvasKit por software si no hay GPU; en el móvil va
   por GPU.
 - iOS: el signo del acelerómetro y la vibración no se han probado en un iPhone real.
