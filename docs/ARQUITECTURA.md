@@ -251,8 +251,8 @@ con tests). En la web no hace nada.
 
 - **Sonido al terminar** (`expo-audio`): se precarga una vez, se libera al desmontar y suena
   una vez solo si la cuenta llega a 0 sola (en ciclos, al acabar la última ronda).
-- **Sonido de cambio de fase** (`cambio.mp3`, propio): dos notas suaves de campanilla, más
-  bajas de volumen que el aviso de fin, al pasar de trabajo a descanso o al revés.
+- **Sonido de cambio de fase** (`cambio.mp3`, «Swoosh 07» de Pixabay): un barrido suave, más
+  bajo de volumen que el aviso de fin, al pasar de trabajo a descanso o al revés.
 - El interruptor **«Sonido»** del menú (ajuste `sound`) los silencia los dos. En web, los navegadores solo permiten audio
   después de una interacción del usuario; como para empezar hay que tocar el reloj, funciona.
   Si un navegador lo bloqueara, la app sigue igual (el fallo se ignora).
