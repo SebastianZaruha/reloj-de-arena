@@ -145,7 +145,13 @@ su ángulo de reposo, el cráter del bulbo superior y los deslizamientos.
   llama el **controlador de flujo** al ritmo exacto del temporizador
   (`granos arriba = granos iniciales × tiempo restante / duración`). La arena nunca se
   desincroniza del tiempo, aunque el móvil vaya lento.
-- Al retirar un grano del cuello, **la columna de encima baja en bloque**, como en un reloj real.
+- **Se vacía desde abajo, en embudo (1.6):** el grano que pasa es el de junto al cuello; la arena
+  de encima baja a llenar el hueco fila a fila hasta la superficie, y en cada fila lo llena el
+  grano de encima o uno de los de encima en diagonal, al azar (`collapseColumn`, el «modelo
+  cinemático» de los silos). Así la superficie baja más en el centro y los lados resbalan hacia
+  él. Antes bajaba una columna recta y se veía un canal vertical hasta el cuello.
+- **Superficie en reposo (1.6):** al elegir duración o reiniciar, la arena de arriba ya forma un
+  embudo suave (`crater` 0,25) con una ondulación leve, no una línea recta.
 - **Una masa cae entera (1.6):** cuando un grano cae al vacío, la columna que tiene encima baja
   con él en el mismo paso (`followColumn`). Antes cada grano se enteraba un paso tarde y una
   masa grande (el bulbo lleno tras dar la vuelta) se abría en filas: rayas y un enrejado en V.

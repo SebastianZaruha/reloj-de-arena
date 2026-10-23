@@ -98,6 +98,11 @@ const STEPS_PER_FRAME = 2;
  * tiempo, se acumulaba retraso y salía a tirones. A 60 fps: 1 (como siempre).
  */
 const MAX_CATCH_UP = 3;
+/**
+ * Embudo suave de la arena en reposo (al elegir duración o reiniciar):
+ * el centro algo más bajo que los lados, nunca una línea recta (1.6).
+ */
+const IDLE_CRATER = 0.25;
 /** Cambio mínimo de inclinación para regrabar las capas del vidrio (más pequeño no se ve). */
 const LIGHT_EPSILON = 0.01;
 
@@ -274,7 +279,9 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
           snap.status === 'idle'
             ? state.runInitial
             : targetSourceGrains(state.runInitial, snap.remainingMs, snap.durationMs);
-        p.sim.arrange(top, p.sim.totalGrains - top, gs, { crater: snap.status === 'idle' ? 0 : 0.35 });
+        p.sim.arrange(top, p.sim.totalGrains - top, gs, {
+          crater: snap.status === 'idle' ? IDLE_CRATER : 0.35,
+        });
         state.populated = p.sim;
         particles.reset(7);
         changed = true;
@@ -351,7 +358,7 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
     if (status !== 'idle') return;
     const state = loop.current;
     sim.arrange(initialGrains, sim.totalGrains - initialGrains, live.current.motion.simGravity, {
-      crater: 0,
+      crater: IDLE_CRATER,
     });
     state.populated = sim;
     state.runInitial = initialGrains;

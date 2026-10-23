@@ -647,8 +647,16 @@ export class SandSimulation {
       const h = -(col * g.x + row * g.y);
       // Distancia al eje del chorro, perpendicular a la gravedad.
       const off = Math.abs((col - cx) * -g.y + (row - cy) * g.x);
-      // Un poco de ruido estable para que la superficie no sea perfecta.
-      const jitter = ((hash32(i * 7919 + this.seed) & 1023) / 1023) * 0.6;
+      // Un poco de ruido estable para que la superficie no sea perfecta:
+      // grano a grano y, además, una ondulación suave (unas pocas celdas de
+      // ancho) para que no quede una línea recta perfecta.
+      const u = (col - cx) * -g.y + (row - cy) * g.x;
+      // (Solo en el bulbo que se vacía: el montón de abajo ya es natural.)
+      const wobble =
+        slope > 0
+          ? 0
+          : 0.8 * Math.sin(u * 0.23 + this.seed * 0.37) + 0.45 * Math.sin(u * 0.61 + this.seed * 1.13);
+      const jitter = ((hash32(i * 7919 + this.seed) & 1023) / 1023) * 0.6 + wobble;
       keys.set(i, h + slope * off + jitter);
       list.push(i);
     }
@@ -691,19 +699,38 @@ export class SandSimulation {
   }
 
   /**
-   * Tras vaciar la celda `hole`, baja un puesto todos los granos contiguos
-   * que hay encima (en contra de la gravedad).
+   * Tras vaciar la celda `hole` (un grano ha salido por el cuello), la
+   * arena de encima baja a llenar el hueco, fila a fila hasta la superficie.
+   *
+   * Como en un reloj real (y en el «modelo cinemático» de los silos), el
+   * hueco no sube en línea recta: en cada fila lo llena el grano de encima
+   * o uno de los dos de encima en diagonal, al azar. Así lo que se vacía es
+   * un embudo ancho alrededor del eje (la superficie baja más en el centro y
+   * los lados resbalan hacia él) y no una columna: antes se veía un canal
+   * vertical desde la superficie hasta el cuello.
    * @returns la celda que queda vacía arriba del todo.
    */
   private collapseColumn(hole: number, dir: 1 | -1): number {
+    const { cols, cells, mask, rng } = this;
     let current = hole;
     for (;;) {
-      const above = current - dir * this.cols;
-      if (above < 0 || above >= this.cells.length) break;
-      if (this.mask[above] !== 1 || this.cells[above] === 0) break;
-      this.cells[current] = this.cells[above] as number;
-      this.cells[above] = 0;
-      current = above;
+      const up = current - dir * cols;
+      if (up < 0 || up >= cells.length) break;
+      const x = current % cols;
+      // Candidatos: encima (peso 2) y las dos diagonales de encima (peso 1).
+      const left = x > 0 && mask[up - 1] === 1 && cells[up - 1] !== 0;
+      const right = x < cols - 1 && mask[up + 1] === 1 && cells[up + 1] !== 0;
+      const straight = mask[up] === 1 && cells[up] !== 0;
+      const weight = (straight ? 2 : 0) + (left ? 1 : 0) + (right ? 1 : 0);
+      if (weight === 0) break;
+      let r = rng() * weight;
+      let from: number;
+      if (straight && (r -= 2) < 0) from = up;
+      else if (left && (r -= 1) < 0) from = up - 1;
+      else from = right ? up + 1 : up - 1;
+      cells[current] = cells[from] as number;
+      cells[from] = 0;
+      current = from;
     }
     return current;
   }
