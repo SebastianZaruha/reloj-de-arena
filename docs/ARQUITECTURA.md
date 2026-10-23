@@ -207,6 +207,13 @@ Las capas estáticas se graban una vez en un `SkPicture`; la arena se graba en c
 se publica en un **shared value** de Reanimated, así el Canvas se redibuja **sin re-renderizar
 componentes de React**.
 
+**Al ritmo de la pantalla (1.8.1).** La simulación corre en el hilo de JavaScript, pero no con
+`requestAnimationFrame` (que no espera a que la interfaz haya dibujado y, en un móvil lento,
+encola fotogramas y retrasa todo lo demás). `useFramePacer` pide el siguiente paso desde el
+hilo de la interfaz (`useFrameCallback`) y solo cuando el anterior ha terminado: como mucho un
+paso por fotograma dibujado y nunca dos en cola. El vidrio (que depende de la inclinación) se
+regraba como mucho 20 veces por segundo; la arena, en cada paso.
+
 ### 4. Realismo de granos y vidrio
 
 | Qué                  | Cómo                                                                                                                                                                                                                                                                                                                                          | Dónde                                                        |
@@ -305,6 +312,12 @@ mano).
   `pictureSlot.ts`: anillo fijo de 8 fotogramas) cuando el lienzo ya no los usa.
 - Nada de Skia vive a nivel de módulo (sobreviviría al Fast Refresh): cada `<Hourglass>`
   compila sus shaders (`resources.ts`) y los libera al desmontarse.
+- **Nada se repinta sin cambios (1.8.1):** el tiempo en pantalla se refresca solo
+  (`TimeDisplay` con `refresh`, 4 veces por segundo) y el resto de la pantalla, el lienzo, el
+  menú y la ayuda solo se re-renderizan cuando cambia el estado de verdad. Con un lector de
+  pantalla activo, la pantalla se actualiza una vez por segundo para que lea el tiempo.
+- **El desenfoque de la pausa** solo cubre la franja del reloj y su sombra: el fondo es un
+  degradado muy suave y desenfocado se ve igual, así que se dibuja fuera de la capa.
 - Si algo falla al dibujar, `HourglassBoundary` remonta el lienzo; si CanvasKit ha muerto, la
   web guarda la cuenta y recarga una vez (`recovery/`).
 - Número de granos: - **Número de granos revisado**: ~6.000 granos simulados en un móvil de 390×844 dp (cada uno se
@@ -362,13 +375,17 @@ constante se ignora.
           ┌─────────────────────────────┴──────────────────────────┐
           ▼                                                        ▼
  FrostedPanel (Skia, DENTRO del lienzo del reloj)       SettingsSheet (React Native, encima)
- velo + sombra + BackdropBlur + tinte + filo de luz      secciones, controles, arrastre
+ velo + sombra + reloj desenfocado + tinte + filo        secciones, controles, arrastre
           └──────────── los dos leen el mismo shared value `offset` ────────────┘
 ```
 
-- **Vidrio esmerilado sin dependencias nuevas:** el desenfoque es un `BackdropBlur` de Skia
-  (radio 26) recortado a la forma de la hoja. Tiene que estar **dentro del mismo `<Canvas>`**
-  que el reloj para poder desenfocar lo que hay debajo; por eso `<Hourglass>` acepta `children`.
+- **Vidrio esmerilado sin dependencias nuevas:** dentro de la forma de la hoja se dibuja el
+  fondo, una **copia desenfocada** (radio 26) de la sombra y el reloj, y el tinte. Tiene que
+  estar **dentro del mismo `<Canvas>`** que el reloj: `<Hourglass>` acepta como `children`
+  una función que recibe su escena (`HourglassScene`). Hasta la 1.8 era un `BackdropBlur`,
+  que lee la pantalla ya dibujada: en las GPU de los móviles eso parte cada fotograma en dos y
+  es lo más caro de todo. Se ve igual (diferencia ≤ 5/255 en capturas). En la web se sigue
+  usando `BackdropBlur`, que allí es más barato.
   Encima, transparente, va el contenido en React Native. Como los dos se mueven con el mismo
   shared value (`offset`), van pegados al píxel, también al arrastrar.
 - **Abrir / cerrar:** botón; tocar fuera (un velo `Pressable` transparente); arrastrar hacia

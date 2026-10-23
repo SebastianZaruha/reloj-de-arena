@@ -39,7 +39,7 @@ servicio en primer plano.
  useSession ──► useBackgroundTimer ──sync(payload)──► BackgroundTimer.sync
    ▲              (backgroundSync.ts)                 ├─ TimerStore      (guarda en SharedPreferences)
    │                                                  ├─ TimerNotifications (notificación fija con cronómetro)
-   │                                                  └─ TimerAlarms     (una alarma exacta por aviso)
+   │                                                  └─ TimerAlarms     (una alarma exacta: la próxima)
    │
    │   onChange{seq} / getState()      AlarmReceiver  ──► avanza de fase, aviso con sonido, nueva notificación
    └──────────────────────────────── ActionReceiver ──► pausar / reanudar / reiniciar (seq + 1)
@@ -55,9 +55,15 @@ servicio en primer plano.
    están escritos dos veces: en TypeScript (con tests que comprueban que coinciden con el motor
    de sesiones) y en Kotlin (con tests JUnit de los mismos casos). Así los botones de la
    notificación funcionan sin JavaScript.
-3. **Alarmas exactas.** Cada aviso es una alarma `setExactAndAllowWhileIdle` (suena aunque el
-   móvil esté en reposo). Cualquier cambio (pausa, reinicio, otro plan, volteo, cambio de
-   ajustes) cancela todas y programa las nuevas. Sin permiso de alarmas exactas se usa
+3. **Alarmas exactas.** Solo está programada **la próxima** alarma
+   `setExactAndAllowWhileIdle` (suena aunque el móvil esté en reposo); al sonar, programa la
+   siguiente. Cualquier cambio (pausa, reinicio, otro plan, volteo, cambio de ajustes) la
+   cambia por la nueva. Hasta la 1.8 se programaban todas (hasta 48), y cada cambio hacía
+   más de cien llamadas al sistema en el hilo de JavaScript.
+   **`sync` no bloquea la app (1.8.1):** la llamada desde JavaScript solo guarda el último
+   estado y vuelve; el trabajo (guardar, notificación, alarma, ventana flotante) se hace en un
+   hilo propio (`reloj-segundo-plano`), y si llegan varios seguidos solo se aplica el último.
+   Los canales de notificación solo se recrean si cambian sus textos. Sin permiso de alarmas exactas se usa
    `setAndAllowWhileIdle`: suena igual, pero Android puede retrasarlo unos minutos.
 4. **Quién manda: el número de secuencia (`seq`).** Cada botón de la notificación sube `seq`.
    Cuando la app vuelve, lee el estado nativo y, si `seq` es nuevo, **adopta** esa sesión

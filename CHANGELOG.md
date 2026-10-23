@@ -9,6 +9,79 @@ funcionamiento interno en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md).
 > APK de desarrollo. A partir de la publicación en GitHub basta con `git pull`; las
 > instrucciones «Cómo actualizar» se conservan como referencia.
 
+## 1.8.1 — Arreglo de rendimiento (la app iba a tirones en el móvil)
+
+Con la 1.8 la app iba muy lenta en el móvil: la hoja de ajustes aparecía de golpe y sin vidrio,
+el desenfoque llegaba tarde (y se quedaba un momento tras cerrar), el volteo daba saltos y
+«Pausa» aparecía con retraso. Todo era el mismo problema: **el hilo de JavaScript iba
+saturado**, así que lo que dependía de él (montar el vidrio, quitarlo, mostrar la pausa)
+llegaba tarde. **Sin cambios visibles**: se ve igual que la 1.8.
+
+### Qué lo causaba
+
+1. **La pantalla entera se re-renderizaba 4 veces por segundo** con el reloj en marcha (para
+   actualizar el tiempo): en 4 s, 17 renders del lienzo, el menú y la pantalla principal, y 34
+   de las pantallas de ayuda (la de la ventana flotante, nueva en la 1.8, sumaba su parte).
+2. **La simulación usaba `requestAnimationFrame`**, que no espera a que la interfaz haya
+   dibujado: en un móvil lento se encolaban fotogramas y todo lo demás esperaba detrás.
+3. **Cada cambio de estado (1.7 y 1.8) hacía el trabajo nativo en el hilo de JavaScript:**
+   guardar, la notificación, recrear los canales y programar hasta 48 alarmas (más de cien
+   llamadas al sistema), justo al tocar, pausar o voltear.
+4. **El vidrio del menú era un `BackdropBlur`**, que en las GPU de los móviles obliga a partir
+   cada fotograma en dos para leer la pantalla.
+
+### Qué cambia
+
+| Qué                 | Cómo                                                                                                          | Dónde                                  |
+| ------------------- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| Sin renders de más  | El tiempo se refresca solo; el resto solo cuando cambia el estado. En 4 s en marcha: 0 renders (antes 17).    | `TimeDisplay.tsx`, `useSession.ts`     |
+| Arena al ritmo      | Un paso de simulación por fotograma dibujado, nunca dos en cola. Vidrio regrabado ≤ 20 veces/s.               | `useFramePacer.ts`, `useSandEngine.ts` |
+| Segundo plano       | `sync` vuelve al momento; el trabajo va en un hilo propio. Una sola alarma (la próxima).                      | `BackgroundTimer.kt`, `TimerAlarms.kt` |
+| Vidrio del menú     | Redibuja el fondo y una copia desenfocada del reloj en su forma, sin leer la pantalla (web: igual que antes). | `FrostedPanel.tsx`, `Hourglass.tsx`    |
+| Desenfoque de pausa | Solo en la franja del reloj, no en toda la pantalla.                                                          | `Hourglass.tsx`                        |
+| APK                 | **Release**: el JavaScript va dentro, compilado a bytecode de Hermes y minificado. No necesita el PC.         | —                                      |
+
+**Los APK anteriores (1.3, 1.7 y 1.8) eran _development builds_:** cargaban el JavaScript desde
+Metro, en el PC, en modo desarrollo (sin minificar y con comprobaciones extra de React y
+Reanimated). Eso también los hacía más lentos. Este APK es una versión _release_ firmada con la
+clave de depuración: no se conecta al PC, no tiene el menú de desarrollo y los cambios de
+código necesitan APK nuevo (para desarrollar con Metro, compila el de desarrollo con `assembleDebug`, como siempre).
+
+### Medido
+
+Web con la CPU 4 veces más lenta (Chromium sin GPU, 390×844), 1.6 → 1.8.1:
+
+| Momento                       | 1.6       | 1.8.1     |
+| ----------------------------- | --------- | --------- |
+| En marcha                     | 14–20 fps | 30–32 fps |
+| Abriendo el menú              | 15–16 fps | 22–25 fps |
+| Cerrando el menú              | 18–20 fps | 29–31 fps |
+| Pausa                         | 41–43 fps | 42–45 fps |
+| Tareas largas en marcha (4 s) | 1,1–1,7 s | 0,4–0,7 s |
+
+Con el JavaScript compilado para producción (como en el APK nuevo), las tareas largas con el
+reloj en marcha bajan a 0,15 s en 4 s. Llamadas al módulo nativo: una por cambio real de estado, ninguna por segundo ni al abrir o
+cerrar el menú. La memoria no cambia. **No se ha podido probar en un móvil** (sin emulador):
+las cifras son de la web.
+
+### Cómo actualizar desde la 1.8
+
+1. `git pull`. No hace falta `npm install`.
+2. Instala `reloj-de-arena-1.8.1-dev.apk` (encima de la 1.8: conserva ajustes y permisos). O
+   compílalo: `cd apps/mobile`, `npx expo prebuild --platform android --clean`, y en `android/`
+   `./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a`.
+3. Ábrela sin el servidor de Expo: no lo necesita.
+4. **En el móvil:** empieza un reloj, abre y cierra el menú, túmbalo para pausar y voltéalo:
+   la hoja debe deslizarse con el vidrio ya puesto y la pausa desenfocarse a la vez que sale
+   «Pausa». Comprueba que la notificación y la ventana flotante siguen al día.
+
+### Pruebas
+
+- Core: **184 tests**; módulo Kotlin: **35 tests** (4 nuevos: una sola alarma, la siguiente al
+  sonar y limpieza de las antiguas).
+- `npm run check` limpio. Capturas de la pausa y del menú comparadas píxel a píxel con la 1.8:
+  iguales (diferencia máxima 5/255 en el vidrio).
+
 ## 1.8.0 — Ventana flotante e imagen en imagen (Android)
 
 Segunda parte de la fase 4: con **«Ventana flotante»** activada en el menú, al salir de la app

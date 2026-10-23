@@ -162,6 +162,11 @@ El parámetro `-PreactNativeArchitectures=arm64-v8a` compila solo para arm64 (to
 de los últimos años) y tarda unas 4 veces menos; quítalo para incluir todas las arquitecturas.
 Si Gradle se queda sin memoria, añade `-Dorg.gradle.jvmargs=-Xmx3g`.
 
+**APK que no necesita el PC** (desde la 1.8.1): `./gradlew assembleRelease
+-PreactNativeArchitectures=arm64-v8a` (sale en `app/build/outputs/apk/release/app-release.apk`).
+Lleva el JavaScript dentro, compilado y minificado, así que va más fluido; no tiene el menú de
+desarrollo ni carga los cambios desde el PC.
+
 Para instalarlo: copia el APK al móvil, ábrelo y permite **instalar apps de orígenes
 desconocidos**. Está firmado con la clave de depuración estándar, así que Play Protect puede
 avisar (_Instalar de todas formas_). El permiso de actividad física que añade `expo-sensors`
