@@ -13,6 +13,7 @@
  * `sv.value`: es lo que recomienda Reanimated 4 para que las reglas del
  * React Compiler (lint) entiendan que no estamos mutando un valor de React.
  */
+import { SheetToggle } from '@reloj/core';
 import { useCallback, useState } from 'react';
 import {
   Easing,
@@ -37,6 +38,12 @@ export interface SheetState {
   readonly openness: SharedValue<number>;
   readonly show: () => void;
   readonly hide: () => void;
+  /**
+   * Para el botón del menú (1.8.2): abre o cierra, pero ignora los toques
+   * mientras la hoja se está moviendo. Así unos toques de más (p. ej. si la
+   * hoja tarda en salir) no la cierran nada más abrirse.
+   */
+  readonly toggle: () => void;
 }
 
 export function useSheet(screenHeight: number, reduceMotion: boolean): SheetState {
@@ -50,7 +57,13 @@ export function useSheet(screenHeight: number, reduceMotion: boolean): SheetStat
     height.value > 0 ? Math.min(1, Math.max(0, 1 - offset.value / height.value)) : 0,
   );
 
+  // Estado real al momento (el `open` de React llega un render después) y
+  // qué hacer con cada toque del botón (ver SheetToggle en el core).
+  const [gate] = useState(() => new SheetToggle());
+
   const show = useCallback(() => {
+    // Ya abierta o abriéndose: nada que hacer.
+    if (!gate.show(Date.now(), reduceMotion ? 0 : SHEET_OPEN_MS)) return;
     setVisible(true);
     setOpen(true);
     // Si estaba escondida del todo, empieza justo por debajo del borde.
@@ -58,9 +71,10 @@ export function useSheet(screenHeight: number, reduceMotion: boolean): SheetStat
     offset.set(
       reduceMotion ? 0 : withTiming(0, { duration: SHEET_OPEN_MS, easing: Easing.out(Easing.cubic) }),
     );
-  }, [offset, height, reduceMotion]);
+  }, [gate, offset, height, reduceMotion]);
 
   const hide = useCallback(() => {
+    if (!gate.hide(Date.now(), reduceMotion ? 0 : SHEET_CLOSE_MS)) return;
     setOpen(false);
     const finish = (finished?: boolean) => {
       'worklet';
@@ -74,7 +88,13 @@ export function useSheet(screenHeight: number, reduceMotion: boolean): SheetStat
     offset.set(
       withTiming(height.get() + 40, { duration: SHEET_CLOSE_MS, easing: Easing.in(Easing.quad) }, finish),
     );
-  }, [offset, height, reduceMotion]);
+  }, [gate, offset, height, reduceMotion]);
 
-  return { open, visible, offset, height, top, openness, show, hide };
+  const toggle = useCallback(() => {
+    const action = gate.press(Date.now());
+    if (action === 'show') show();
+    if (action === 'hide') hide();
+  }, [gate, show, hide]);
+
+  return { open, visible, offset, height, top, openness, show, hide, toggle };
 }

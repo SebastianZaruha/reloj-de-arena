@@ -220,7 +220,6 @@ export function TimerScreen({ settings, fonts }: Props) {
   const buttonOpacity = useDerivedValue(
     () => intro.chrome.value * (1 - 0.6 * sheet.openness.value) * (1 - helpFade.value),
   );
-  const toggleMenu = () => (sheet.open ? sheet.hide() : sheet.show());
 
   // ─── Ayuda de gestos (1.6): con el «?» del menú y, sola, una vez ────────
   const [helpOpen, setHelpOpen] = useState(false);
@@ -570,7 +569,7 @@ export function TimerScreen({ settings, fonts }: Props) {
           <MenuButton
             top={(tilt.flipped ? safe.bottom : safe.top) + 8}
             expanded={sheet.open}
-            onPress={toggleMenu}
+            onPress={sheet.toggle}
             opacity={buttonOpacity}
             themeProgress={themeProgress}
           />
