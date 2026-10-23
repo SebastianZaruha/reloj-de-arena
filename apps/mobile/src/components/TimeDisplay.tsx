@@ -22,7 +22,7 @@ import { DARK_THEME, LIGHT_THEME } from '../theme/theme';
  * Alto de línea del tiempo (px). Fijo para que mida lo mismo en Android, iOS
  * y web; TimerScreen lo usa para colocar el texto (ver TIME_BOTTOM).
  */
-export const TIME_LINE_HEIGHT = 40;
+export const TIME_LINE_HEIGHT = 44;
 
 interface Props {
   readonly text: string;
@@ -78,20 +78,21 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
   },
+  // 1.6: un pelín más grandes (tiempo 30 → 34, textos 12 → 13,5; ~12 %).
   time: {
-    fontSize: 30,
+    fontSize: 34,
     lineHeight: TIME_LINE_HEIGHT,
     letterSpacing: 3,
     fontVariant: ['tabular-nums'],
   },
   hint: {
-    fontSize: 12,
+    fontSize: 13.5,
     letterSpacing: 1.2,
     marginBottom: 14,
   },
   // Fase de los ciclos: pequeña, espaciada, en el tono del tiempo.
   label: {
-    fontSize: 12,
+    fontSize: 13.5,
     letterSpacing: 2.2,
     marginBottom: 2,
   },

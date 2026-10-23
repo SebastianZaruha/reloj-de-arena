@@ -97,8 +97,10 @@ const BOTTOM_AREA = 104;
  * Distancia del borde inferior del texto del tiempo al borde seguro (1.3.1).
  * Antes era 34; lo subimos la altura de una línea de texto (TIME_LINE_HEIGHT)
  * para que su borde inferior quede donde antes estaba el superior.
+ * 1.6: el tiempo creció (alto de línea 40 → 44); su borde inferior se queda
+ * donde estaba (34 + 40 = 30 + 44) y el texto crece hacia arriba.
  */
-const TIME_BOTTOM = 34 + TIME_LINE_HEIGHT;
+const TIME_BOTTOM = 30 + TIME_LINE_HEIGHT;
 
 export interface ScreenFonts extends MenuFonts {
   readonly time?: string;
