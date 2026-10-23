@@ -23,10 +23,11 @@ export type ThemePreference = 'system' | 'light' | 'dark';
 
 /**
  * Versión del esquema. 2 (app 1.5): añade sonido, modo de sesión y ciclos.
- * 3 (app 1.6): añade el idioma. Los ajustes de versiones anteriores se
+ * 3 (app 1.6): añade el idioma. 4 (app 1.7): recuerda si ya se pidió el
+ * permiso de notificaciones. Los ajustes de versiones anteriores se
  * migran solos: lo que falta toma su valor por defecto en `sanitizeSettings`.
  */
-export const SETTINGS_VERSION = 3;
+export const SETTINGS_VERSION = 4;
 
 export interface Settings {
   /** Versión del esquema, para migraciones futuras. */
@@ -48,6 +49,12 @@ export interface Settings {
   readonly language: LanguagePreference;
   /** ¿Ya se ha visto la ayuda de gestos? (se muestra sola una vez) (1.6) */
   readonly gesturesSeen: boolean;
+  /**
+   * ¿Ya se explicó y pidió el permiso de notificaciones (y el de alarmas
+   * exactas)? Se pide una sola vez, al empezar el primer reloj; después
+   * solo se ofrece desde el menú (1.7, Android).
+   */
+  readonly alertsPermissionAsked: boolean;
   /** Sonido al terminar y al cambiar de fase (1.5). */
   readonly sound: boolean;
   /** Sesión única (un temporizador) o ciclos trabajo/descanso (1.5). */
@@ -71,6 +78,7 @@ export const DEFAULT_SETTINGS: Settings = Object.freeze({
   theme: 'system',
   language: 'system',
   gesturesSeen: false,
+  alertsPermissionAsked: false,
   haptics: true,
   sound: true,
   sessionMode: 'single',
@@ -102,6 +110,8 @@ export function sanitizeSettings(raw: unknown): Settings {
     // 1.6: ajustes anteriores no traen idioma → Automático.
     language: r.language === 'es' || r.language === 'en' || r.language === 'system' ? r.language : 'system',
     gesturesSeen: r.gesturesSeen === true,
+    // 1.7: ajustes anteriores → aún no se ha pedido.
+    alertsPermissionAsked: r.alertsPermissionAsked === true,
     // Ajustes guardados por versiones anteriores no traen `haptics`: activada.
     haptics: typeof r.haptics === 'boolean' ? r.haptics : DEFAULT_SETTINGS.haptics,
     // Novedades de la 1.5: si no vienen (ajustes de la 1.4), valores por defecto.

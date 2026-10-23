@@ -65,6 +65,13 @@ describe('i18n', () => {
     expect(sanitizeSettings({ language: 'fr' }).language).toBe('system');
   });
 
+  it('el permiso de avisos se pide una sola vez y se recuerda (1.7)', () => {
+    expect(DEFAULT_SETTINGS.alertsPermissionAsked).toBe(false);
+    expect(sanitizeSettings({ version: 3, gesturesSeen: true }).alertsPermissionAsked).toBe(false);
+    expect(sanitizeSettings({ alertsPermissionAsked: true }).alertsPermissionAsked).toBe(true);
+    expect(sanitizeSettings({ alertsPermissionAsked: 1 }).alertsPermissionAsked).toBe(false);
+  });
+
   it('la ayuda de gestos se marca como vista y se recuerda', () => {
     expect(DEFAULT_SETTINGS.gesturesSeen).toBe(false);
     expect(sanitizeSettings({ version: 2 }).gesturesSeen).toBe(false);
