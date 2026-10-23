@@ -42,6 +42,7 @@ import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, { Easing, useAnimatedStyle, withTiming, type SharedValue } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import type { AlertsNotice } from '../../background/useBackgroundTimer';
 import { useT } from '../../i18n/I18n';
 import type { HourglassTheme } from '../../theme/theme';
 import { Chip, Segmented, Stepper, ToggleRow, type SegmentOption } from './controls';
@@ -91,6 +92,8 @@ interface Props {
   readonly safeBottom: number;
   /** Abre la ayuda de gestos (botón «?» de la cabecera). */
   readonly onShowGestures: () => void;
+  /** Falta un permiso de los avisos en segundo plano (1.7, Android): texto y arreglo. */
+  readonly alertsNotice?: AlertsNotice | null;
 }
 
 export function SettingsSheet({
@@ -104,6 +107,7 @@ export function SettingsSheet({
   safeTop,
   safeBottom,
   onShowGestures,
+  alertsNotice = null,
 }: Props) {
   const t = useT();
   const s = useMenuStyles(themeProgress);
@@ -384,6 +388,19 @@ export function SettingsSheet({
                 testID="interruptor-vibracion"
               />
             </View>
+            {/* Solo si falta un permiso: una línea discreta que lo arregla. */}
+            {alertsNotice ? (
+              <Pressable
+                onPress={alertsNotice.onPress}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.notice, pressed && styles.helpPressed]}
+                testID="aviso-permisos"
+              >
+                <Animated.Text style={[styles.noticeText, { fontFamily: fonts.medium }, s.inkSoft]}>
+                  {alertsNotice.text}
+                </Animated.Text>
+              </Pressable>
+            ) : null}
           </View>
         </ScrollView>
       </GestureDetector>
@@ -477,4 +494,6 @@ const styles = StyleSheet.create({
   toggles: { flexDirection: 'row', alignItems: 'center', paddingTop: 2 },
   toggle: { flex: 1 },
   toggleDivider: { width: StyleSheet.hairlineWidth, height: 26, marginHorizontal: 20 },
+  notice: { minHeight: 44, justifyContent: 'center', marginTop: 4 },
+  noticeText: { fontSize: 12, textAlign: 'center', letterSpacing: 0.2, textDecorationLine: 'underline' },
 });

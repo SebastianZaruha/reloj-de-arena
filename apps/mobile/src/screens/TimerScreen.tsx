@@ -19,6 +19,12 @@
  * y vibra dos veces. Encima del tiempo se lee «Trabajo 2/4» o «Descanso 2/4».
  * Al acabar la última ronda suena el aviso de fin y vibra (éxito).
  *
+ * Segundo plano (1.7, Android): una notificación lleva la cuenta atrás (con
+ * Pausar/Reanudar y Reiniciar) y avisa de cada cambio de fase y del final
+ * aunque la app esté cerrada (ver background/ y docs/SEGUNDO_PLANO.md).
+ * Mientras la app no está a la vista, la app no suena ni vibra: lo hace la
+ * notificación.
+ *
  * Movimiento (1.3, acelerómetro; ver src/motion/):
  *  - Inclinar         → la arena se desliza y la luz se mueve.
  *  - Tumbar de lado   → pausa (reloj desenfocado y rótulo «Pausa»).
@@ -71,6 +77,8 @@ import {
 import { useDerivedValue, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useBackgroundTimer } from '../background/useBackgroundTimer';
+import { appShouldAlert } from '../background/visibility';
 import { GesturesHelp } from '../components/GesturesHelp';
 import { HourglassBoundary } from '../components/HourglassBoundary';
 import { FrostedPanel } from '../components/menu/FrostedPanel';
@@ -152,8 +160,13 @@ export function TimerScreen({ settings, fonts }: Props) {
   // Mantener la pantalla encendida mientras cae la arena.
   useKeepAwakeWhile(view.status === 'running');
 
-  // Vibración al empezar / pausar / reanudar / terminar (si está activada).
-  useTimerHaptics(view.status, prefs.haptics);
+  // Vibración al empezar / pausar / reanudar / terminar (si está activada y
+  // la app está a la vista; si no, vibra la notificación).
+  useTimerHaptics(view.status, prefs.haptics, appShouldAlert);
+
+  // Notificación con la cuenta atrás y avisos con la app cerrada (Android).
+  // Devuelve un aviso para el menú si falta algún permiso.
+  const alertsNotice = useBackgroundTimer({ session, settings: prefs, update: settings.update, tr });
 
   // Avisos: cambio de fase y fin (sonido, vibración y lector de pantalla).
   const playCue = useCueSound(prefs.sound);
@@ -161,13 +174,17 @@ export function TimerScreen({ settings, fonts }: Props) {
   useEffect(() => {
     const cue = sessionCue(previousView.current, view);
     previousView.current = { status: view.status, transitions: view.transitions };
+    // En segundo plano (o al volver y ponerse al día) sonó la notificación.
+    const audible = appShouldAlert();
     if (cue === 'phase-change') {
-      playCue(cue);
-      playTimerHaptic('phase');
+      if (audible) {
+        playCue(cue);
+        playTimerHaptic('phase');
+      }
       AccessibilityInfo.announceForAccessibility(phaseSpoken(view, tr));
     } else if (cue === 'finished') {
       // La vibración de éxito la pone useTimerHaptics (running → finished).
-      playCue(cue);
+      if (audible) playCue(cue);
       AccessibilityInfo.announceForAccessibility(view.isCycle ? tr.cyclesDone : tr.timeUp);
     }
     // Solo cuando cambia el estado o la fase (no en cada refresco del texto).
@@ -497,6 +514,7 @@ export function TimerScreen({ settings, fonts }: Props) {
           safeTop={tilt.flipped ? safe.bottom : safe.top}
           safeBottom={tilt.flipped ? safe.top : safe.bottom}
           onShowGestures={showGestures}
+          alertsNotice={alertsNotice}
         />
         <MenuButton
           top={(tilt.flipped ? safe.bottom : safe.top) + 8}

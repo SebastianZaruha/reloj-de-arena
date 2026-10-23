@@ -11,6 +11,9 @@
  *   marcas de tiempo (`settle` en el core), nunca contando ticks.
  * - Al volver de segundo plano (AppState "active") forzamos un refresco: si
  *   pasaron varias fases mientras tanto, `tickSession` las recorre de golpe.
+ * - 1.7 (Android): al arrancar, si la notificación siguió una cuenta con la
+ *   app cerrada, se sigue donde va (`takeBackgroundSession`). Lo que se haga
+ *   desde la notificación entra con `adopt` (ver background/useBackgroundTimer).
  */
 import {
   createSession,
@@ -32,6 +35,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
+import { takeBackgroundSession } from '../background/backgroundSync';
 import { takeRecoveredSession } from '../recovery/sessionRecovery';
 
 const DISPLAY_REFRESH_MS = 250;
@@ -54,12 +58,18 @@ export interface UseSession {
   readonly setPlan: (plan: SessionPlan) => void;
   /** Otro plan SIEMPRE, vuelve al reposo (cambios desde el menú). */
   readonly replacePlan: (plan: SessionPlan) => void;
+  /** Sustituye la sesión entera (cambios hechos desde la notificación, 1.7). */
+  readonly adopt: (state: SessionState) => void;
 }
 
 export function useSession(initialPlan: SessionPlan, clock: Clock = systemClock): UseSession {
-  // Si venimos de una recarga de recuperación (web), seguimos donde íbamos.
+  // Si venimos de una recarga de recuperación (web) o la notificación siguió
+  // la cuenta con la app cerrada (Android), seguimos donde íbamos.
   const [state, setState] = useState<SessionState>(
-    () => takeRecoveredSession(clock.now()) ?? createSession(initialPlan),
+    () =>
+      takeRecoveredSession(clock.now()) ??
+      takeBackgroundSession(initialPlan, clock.now()) ??
+      createSession(initialPlan),
   );
   const stateRef = useRef(state);
   const [, forceRender] = useState(0);
@@ -108,5 +118,6 @@ export function useSession(initialPlan: SessionPlan, clock: Clock = systemClock)
     restart: useCallback(() => apply(restartSession), [apply]),
     setPlan: useCallback((plan: SessionPlan) => apply((s) => setSessionPlan(s, plan)), [apply]),
     replacePlan: useCallback((plan: SessionPlan) => apply((s) => replaceSessionPlan(s, plan)), [apply]),
+    adopt: useCallback((next: SessionState) => apply(() => next), [apply]),
   };
 }
