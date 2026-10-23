@@ -94,6 +94,35 @@ export const es = {
   gestureSide: 'Tumba el móvil de lado para pausar; de pie, sigue',
   gestureFlip: 'Dale la vuelta para empezar de cero',
   gestureSheet: 'Arrastra el menú hacia abajo para cerrarlo',
+  // ─── Notificación y avisos con la app en segundo plano (1.7, Android) ───
+  /** Título de la notificación en sesión única (en ciclos, «Trabajo 1/4»). */
+  notifTimer: 'Temporizador',
+  notifResume: 'Reanudar',
+  /** Debajo del título mientras corre: cuándo acaba el tramo. */
+  notifUntil: (time: string) => `Hasta las ${time}`,
+  notifPausedLeft: (time: string) => `En pausa · quedan ${time}`,
+  /** Aviso al empezar un tramo: «A descansar: 5 minutos». */
+  notifPhaseAlert: (kind: PhaseKindName, duration: string) =>
+    kind === 'focus' ? `A trabajar: ${duration}` : `A descansar: ${duration}`,
+  notifFinishedBody: 'Toca para abrir el reloj',
+  /** Nombres de los canales (Ajustes del sistema → Notificaciones). */
+  channelCountdown: 'Cuenta atrás',
+  channelFinished: 'Fin del tiempo',
+  channelPhase: 'Cambio de fase',
+  channelSoundOnly: 'solo sonido',
+  channelVibrationOnly: 'solo vibración',
+  // ─── Permisos (1.7, Android) ───
+  permissionTitle: 'Avisos con la app cerrada',
+  permissionBody:
+    'Para avisarte al terminar o al cambiar de fase aunque la app esté en segundo plano o cerrada, el reloj necesita mostrar notificaciones.',
+  permissionAllow: 'Permitir',
+  permissionNotNow: 'Ahora no',
+  exactAlarmTitle: 'Avisos a su hora',
+  exactAlarmBody:
+    'Para que los avisos lleguen en el segundo exacto, activa «Alarmas y recordatorios» para el Reloj de Arena.',
+  openSystemSettings: 'Abrir ajustes',
+  alertsBlocked: 'Notificaciones desactivadas · toca para activarlas',
+  exactAlarmsBlocked: 'Los avisos pueden llegar tarde · toca para arreglarlo',
 };
 
 export type Messages = typeof es;
@@ -158,6 +187,29 @@ export const en: Messages = {
   gestureSide: 'Turn the phone on its side to pause; stand it up to resume',
   gestureFlip: 'Turn it upside down to start over',
   gestureSheet: 'Drag the menu down to close it',
+  notifTimer: 'Timer',
+  notifResume: 'Resume',
+  notifUntil: (time) => `Until ${time}`,
+  notifPausedLeft: (time) => `Paused · ${time} left`,
+  notifPhaseAlert: (kind, duration) =>
+    kind === 'focus' ? `Time to work: ${duration}` : `Time for a break: ${duration}`,
+  notifFinishedBody: 'Tap to open the hourglass',
+  channelCountdown: 'Countdown',
+  channelFinished: "Time's up",
+  channelPhase: 'Phase change',
+  channelSoundOnly: 'sound only',
+  channelVibrationOnly: 'vibration only',
+  permissionTitle: 'Alerts with the app closed',
+  permissionBody:
+    'To alert you when time is up or the phase changes, even with the app in the background or closed, the hourglass needs to show notifications.',
+  permissionAllow: 'Allow',
+  permissionNotNow: 'Not now',
+  exactAlarmTitle: 'On-time alerts',
+  exactAlarmBody:
+    'For alerts to arrive at the exact second, turn on "Alarms & reminders" for Reloj de Arena.',
+  openSystemSettings: 'Open settings',
+  alertsBlocked: 'Notifications are off · tap to turn them on',
+  exactAlarmsBlocked: 'Alerts may arrive late · tap to fix it',
 };
 
 export const MESSAGES: Readonly<Record<Language, Messages>> = { es, en };
