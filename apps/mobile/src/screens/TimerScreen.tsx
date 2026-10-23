@@ -74,7 +74,13 @@ import {
   useTapGesture,
   type GestureTouchEvent,
 } from 'react-native-gesture-handler';
-import { useDerivedValue, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, {
+  useAnimatedStyle,
+  useDerivedValue,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useBackgroundTimer } from '../background/useBackgroundTimer';
@@ -217,6 +223,11 @@ export function TimerScreen({ settings, fonts }: Props) {
   const timeOpacity = useDerivedValue(
     () => intro.chrome.value * (1 - sheet.openness.value) * (1 - helpFade.value),
   );
+  // «Pausa» se apaga con la hoja o una ayuda delante (1.8.2): el vidrio de
+  // la hoja se dibuja en el lienzo, DEBAJO de esta capa, y el contenido de la
+  // hoja es transparente, así que el rótulo se vería encima del menú.
+  const pauseOpacity = useDerivedValue(() => (1 - sheet.openness.value) * (1 - helpFade.value));
+  const pauseFade = useAnimatedStyle(() => ({ opacity: pauseOpacity.value }));
   const buttonOpacity = useDerivedValue(
     () => intro.chrome.value * (1 - 0.6 * sheet.openness.value) * (1 - helpFade.value),
   );
@@ -510,14 +521,16 @@ export function TimerScreen({ settings, fonts }: Props) {
 
       {pip ? null : (
         <View style={[StyleSheet.absoluteFill, overlayStyle]} pointerEvents="none">
-          <PauseLabel
-            visible={paused}
-            sideSign={blurred ? tilt.sideSign : 0}
-            theme={theme}
-            font={fonts.time}
-            text={tr.paused}
-            reduceMotion={reduceMotion}
-          />
+          <Animated.View style={[StyleSheet.absoluteFill, pauseFade]} testID="capa-pausa">
+            <PauseLabel
+              visible={paused}
+              sideSign={blurred ? tilt.sideSign : 0}
+              theme={theme}
+              font={fonts.time}
+              text={tr.paused}
+              reduceMotion={reduceMotion}
+            />
+          </Animated.View>
           <TimeDisplay
             text={formatDuration(displayMs)}
             refresh={view.status === 'running' ? liveTime : null}
