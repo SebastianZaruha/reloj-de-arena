@@ -34,6 +34,7 @@ import {
   formatDuration,
   getContent,
   getHourglassModel,
+  inMenuGuard,
   MINUTE_MS,
   nearestStepIndex,
   planForCycle,
@@ -60,10 +61,12 @@ import {
 } from 'react-native';
 import {
   GestureDetector,
+  GestureStateManager,
   useCompetingGestures,
   useLongPressGesture,
   usePanGesture,
   useTapGesture,
+  type GestureTouchEvent,
 } from 'react-native-gesture-handler';
 import { useDerivedValue, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -275,6 +278,35 @@ export function TimerScreen({ settings, fonts }: Props) {
   // la hoja lo tapan, así que tampoco recibirían toques).
   const gesturesOn = !sheet.open && !helpOpen;
 
+  // Zona de guarda del botón del menú (1.6): un toque, una pulsación larga o
+  // un deslizamiento que EMPIEZA en la esquina del botón no llega al reloj.
+  // En Android el toque sobre el Pressable del botón también llegaba al
+  // gesto de toque del reloj (Gesture Handler reconoce en nativo, aparte del
+  // sistema de toques de React Native) y empezaba o pausaba el tiempo. Se
+  // hace fallar el gesto en cuanto el dedo baja ahí (onTouchesDown) y, por si
+  // acaso, se comprueba otra vez al activarse.
+  const guard = {
+    width,
+    height,
+    safeTop: safe.top,
+    safeBottom: safe.bottom,
+    flipped: tilt.flipped,
+  };
+  const guardRef = useLatest(guard);
+  const inGuard = (x: number, y: number) => inMenuGuard(x, y, guardRef.current);
+  const failInGuard = (e: GestureTouchEvent) => {
+    const touch = e.allTouches[0];
+    if (!touch || !inGuard(touch.absoluteX, touch.absoluteY)) return;
+    // En Android/iOS el módulo nativo instala el puente en el hilo de JS. En
+    // la web no existe (allí el botón ya tapa toda la zona y los toques no
+    // llegan al reloj): la comprobación de onActivate basta.
+    try {
+      GestureStateManager.fail(e.handlerTag);
+    } catch {
+      /* sin puente nativo */
+    }
+  };
+
   const pan = usePanGesture({
     runOnJS: true,
     enabled: gesturesOn && view.status !== 'running',
@@ -283,6 +315,7 @@ export function TimerScreen({ settings, fonts }: Props) {
     // La duración solo se elige deslizando con UN dedo, en vertical. Con dos
     // dedos (p. ej. al intentar pellizcar) el gesto no hace nada.
     maxPointers: 1,
+    onTouchesDown: failInGuard,
     onActivate: () => {
       dragStart.current = adjustableMs();
       ticker.current?.reset(dragStart.current);
@@ -303,7 +336,9 @@ export function TimerScreen({ settings, fonts }: Props) {
   const tap = useTapGesture({
     runOnJS: true,
     enabled: gesturesOn,
-    onActivate: () => {
+    onTouchesDown: failInGuard,
+    onActivate: (e) => {
+      if (inGuard(e.absoluteX, e.absoluteY)) return;
       setInteracted(true);
       // Con el dedo manda la persona: deja de ser "pausa por inclinación".
       setTiltPaused(false);
@@ -315,7 +350,10 @@ export function TimerScreen({ settings, fonts }: Props) {
     runOnJS: true,
     enabled: gesturesOn,
     minDuration: 650,
-    onActivate: () => latest.current.restart(),
+    onTouchesDown: failInGuard,
+    onActivate: (e) => {
+      if (!inGuard(e.absoluteX, e.absoluteY)) latest.current.restart();
+    },
   });
 
   const gesture = useCompetingGestures(pan, longPress, tap);

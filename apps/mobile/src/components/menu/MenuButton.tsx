@@ -3,8 +3,12 @@
  * corta) en un tono muy cercano al fondo, arriba a la derecha. Se nota lo
  * justo: el protagonista es el reloj.
  *
- * Área táctil de 48 × 48 px aunque el dibujo mida 20 × 9.
+ * Área táctil (1.6): TODA la zona de guarda de la esquina (MENU_GUARD_SIZE
+ * desde el borde, bajo el margen seguro), aunque el dibujo mida 20 × 9. En
+ * esa zona los gestos del reloj no hacen nada (ver TimerScreen), así que un
+ * toque ahí solo abre el menú, nunca empieza ni pausa el tiempo.
  */
+import { MENU_GUARD_SIZE } from '@reloj/core';
 import { Pressable, StyleSheet } from 'react-native';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 
@@ -12,6 +16,7 @@ import { useT } from '../../i18n/I18n';
 import { useThemedBackground } from './themedStyles';
 
 interface Props {
+  /** Altura del dibujo: margen seguro + 8. */
   readonly top: number;
   readonly expanded: boolean;
   readonly onPress: () => void;
@@ -25,28 +30,31 @@ export function MenuButton({ top, expanded, onPress, opacity, themeProgress }: P
   const line = useThemedBackground(themeProgress, 'menuIcon');
   const fade = useAnimatedStyle(() => ({ opacity: opacity.value }));
   return (
-    <Animated.View style={[styles.wrap, { top }, fade]}>
+    <Animated.View style={[styles.wrap, fade]}>
       <Pressable
         onPress={onPress}
-        style={({ pressed }) => [styles.button, pressed && styles.pressed]}
+        style={({ pressed }) => [
+          styles.button,
+          { height: top - 8 + MENU_GUARD_SIZE },
+          pressed && styles.pressed,
+        ]}
         accessibilityRole="button"
         accessibilityLabel={t.settings}
         accessibilityHint={expanded ? t.closeSettingsHint : t.openSettings}
         aria-expanded={expanded}
         testID="boton-menu"
       >
-        <Animated.View style={[styles.line, styles.long, line]} />
-        <Animated.View style={[styles.line, styles.short, line]} />
+        <Animated.View style={[styles.line, { top: top + 19, width: 20 }, line]} />
+        <Animated.View style={[styles.line, { top: top + 27, width: 13 }, line]} />
       </Pressable>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { position: 'absolute', right: 10 },
-  button: { width: 48, height: 48 },
+  wrap: { position: 'absolute', top: 0, right: 0 },
+  button: { width: MENU_GUARD_SIZE },
   pressed: { opacity: 0.5 },
-  line: { position: 'absolute', right: 14, height: 1.5, borderRadius: 1 },
-  long: { top: 19, width: 20 },
-  short: { top: 27, width: 13 },
+  // Mismo sitio que antes: botón de 48 px a 10 px del borde, rayas a 14 px.
+  line: { position: 'absolute', right: 24, height: 1.5, borderRadius: 1 },
 });
