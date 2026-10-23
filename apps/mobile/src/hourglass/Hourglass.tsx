@@ -35,6 +35,7 @@ import { Blur, Canvas, Group, Image, Paint, Picture, useCanvasRef } from '@shopi
 import { memo, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 import { useDerivedValue, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 
 import type { HourglassTheme } from '../theme/theme';
 import { disposeLater } from './disposal';
@@ -63,8 +64,14 @@ export interface HourglassPose {
   readonly shadow: SharedValue<number>;
 }
 
-/** Desenfoque (px) del reloj en la pausa por tumbar el móvil. */
-const PAUSE_BLUR = 9;
+/**
+ * Desenfoque del reloj en pausa:
+ *  - 'full' (9 px): pausa por tumbar el móvil; el reloj «se aparta».
+ *  - 'soft' (2,5 px): pausa con el dedo; se nota la pausa pero el reloj y su
+ *    arena se siguen viendo bien (la persona puede querer mirar cuánto queda).
+ */
+export type PauseBlur = 'none' | 'soft' | 'full';
+const PAUSE_BLUR_PX: Record<PauseBlur, number> = { none: 0, soft: 2.5, full: 9 };
 
 export interface HourglassProps {
   readonly width: number;
@@ -79,8 +86,8 @@ export interface HourglassProps {
   readonly durationMs: number;
   /** Gravedad e inclinación en vivo (acelerómetro). Por defecto, quieto y de pie. */
   readonly motion?: MotionSource;
-  /** Desenfocar el reloj (pausa por tumbar el móvil). */
-  readonly blurred?: boolean;
+  /** Desenfoque de pausa (ver `PauseBlur`). */
+  readonly pauseBlur?: PauseBlur;
   readonly reduceMotion?: boolean;
   /** Pose animada del reloj (introducción). Sin ella, quieto en su sitio. */
   readonly pose?: HourglassPose;
@@ -114,7 +121,7 @@ function HourglassCanvas({
   status,
   durationMs,
   motion = STILL_MOTION,
-  blurred = false,
+  pauseBlur = 'none',
   reduceMotion = false,
   pose,
   poseActive = false,
@@ -209,14 +216,30 @@ function HourglassCanvas({
   const objectLayer = poseActive ? <Paint opacity={objectOpacity} /> : undefined;
   const shadowLayer = poseActive || turning ? <Paint opacity={shadowOpacity} /> : undefined;
 
-  // Desenfoque suave al entrar en la pausa (con "reducir movimiento", directo).
+  // Desenfoque suave al entrar Y al salir de la pausa (con «reducir
+  // movimiento», directo). El filtro solo existe mientras hace falta (cuesta
+  // GPU): se crea al pausar y se quita cuando el desenfoque ha vuelto a 0.
   const blur = useSharedValue(0);
+  const target = PAUSE_BLUR_PX[pauseBlur];
+  const [blurLayerOn, setBlurLayerOn] = useState(target > 0);
+  // Patrón «estado derivado» de React (ajuste durante el render).
+  if (target > 0 && !blurLayerOn) setBlurLayerOn(true);
+  if (target === 0 && reduceMotion && blurLayerOn) setBlurLayerOn(false);
   useEffect(() => {
-    blur.value = blurred ? (reduceMotion ? PAUSE_BLUR : withTiming(PAUSE_BLUR, { duration: 320 })) : 0;
-  }, [blurred, reduceMotion, blur]);
+    if (reduceMotion) {
+      blur.set(target);
+      return;
+    }
+    const off = () => setBlurLayerOn(false);
+    blur.set(
+      withTiming(target, { duration: target > 0 ? 320 : 240 }, (finished) => {
+        'worklet';
+        if (finished && target === 0) scheduleOnRN(off);
+      }),
+    );
+  }, [target, reduceMotion, blur]);
 
-  // El filtro de desenfoque solo existe mientras hace falta (cuesta GPU).
-  const layer = blurred ? (
+  const layer = blurLayerOn ? (
     <Paint>
       <Blur blur={blur} mode="clamp" />
     </Paint>

@@ -27,6 +27,13 @@ grano, se desliza al inclinar el móvil y empieza de nuevo al darle la vuelta.**
 
 <p align="center"><sub>Versión 1.5: menú de ajustes en claro y oscuro, un ciclo en su descanso y un fotograma de la entrada.</sub></p>
 
+<p align="center">
+  <img src="docs/capturas/15-pausa-toque-claro.png" width="28%" alt="Pausa con el dedo, tema claro: «Pausa» centrado" />
+  <img src="docs/capturas/15-pausa-toque-oscuro.png" width="28%" alt="Pausa con el dedo, tema oscuro, en un ciclo" />
+</p>
+
+<p align="center"><sub>Versión 1.6: la pausa con el dedo muestra «Pausa» grande, centrado, con un desenfoque ligero.</sub></p>
+
 ## Índice
 
 1. [Características](#características)
@@ -52,7 +59,7 @@ un fondo cálido y difuso. Todo se maneja con gestos; los ajustes viven en un me
 | Gesto                       | Acción                                                        |
 | --------------------------- | ------------------------------------------------------------- |
 | Deslizar **arriba / abajo** | Más / menos tiempo (1 min – 3 h). La arena cambia en vivo.    |
-| **Tocar**                   | Empezar · pausar · reanudar (y volver a empezar al terminar). |
+| **Tocar**                   | Empezar · pausar («Pausa») · reanudar; al terminar, de nuevo. |
 | **Mantener pulsado**        | Reiniciar.                                                    |
 | **Inclinar** el móvil       | La arena se desliza y la luz y la sombra se mueven.           |
 | **Tumbar de lado** (≈90°)   | Pausa (reloj desenfocado y «Pausa»); de pie, sigue.           |

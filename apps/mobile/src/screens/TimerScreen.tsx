@@ -78,7 +78,7 @@ import { PauseLabel } from '../components/PauseLabel';
 import { TIME_LINE_HEIGHT, TimeDisplay } from '../components/TimeDisplay';
 import { appClock } from '../dev/devClock';
 import { playSelectionTick, playTimerHaptic, useTimerHaptics } from '../haptics';
-import { Hourglass } from '../hourglass';
+import { Hourglass, type PauseBlur } from '../hourglass';
 import { useKeepAwakeWhile } from '../hooks/useKeepAwakeWhile';
 import { useLatest } from '../hooks/useLatest';
 import { useSession } from '../hooks/useSession';
@@ -207,7 +207,11 @@ export function TimerScreen({ settings, fonts }: Props) {
   };
   const tilt = useDeviceTilt({ calm: reduceMotion, onEvent: onMotionEvent });
 
-  const blurred = tiltPaused && view.status === 'paused';
+  // Pausa: tumbando el móvil (desenfoque fuerte, rótulo girado) o con el
+  // dedo (desenfoque ligero, rótulo derecho). En las dos, «Pausa» grande.
+  const paused = view.status === 'paused';
+  const blurred = tiltPaused && paused;
+  const pauseBlur: PauseBlur = !paused ? 'none' : blurred ? 'full' : 'soft';
 
   // ─── Elegir el tiempo (deslizar y TalkBack) ─────────────────────────────
   /** Duración que se ajusta: la de la sesión única o el TRABAJO de los ciclos. */
@@ -352,7 +356,7 @@ export function TimerScreen({ settings, fonts }: Props) {
               status={view.status}
               durationMs={view.durationMs}
               motion={tilt.motion}
-              blurred={blurred}
+              pauseBlur={pauseBlur}
               reduceMotion={reduceMotion}
               pose={intro.pose}
               poseActive={intro.active}
@@ -372,7 +376,14 @@ export function TimerScreen({ settings, fonts }: Props) {
       </GestureDetector>
 
       <View style={[StyleSheet.absoluteFill, overlayStyle]} pointerEvents="none">
-        <PauseLabel visible={blurred} sideSign={tilt.sideSign} theme={theme} font={fonts.time} />
+        <PauseLabel
+          visible={paused}
+          sideSign={blurred ? tilt.sideSign : 0}
+          theme={theme}
+          font={fonts.time}
+          text="Pausa"
+          reduceMotion={reduceMotion}
+        />
         <TimeDisplay
           text={formatDuration(displayMs)}
           hint={hint}
@@ -437,7 +448,7 @@ function hintFor(view: SessionSnapshot, interacted: boolean): string | null {
     case 'idle':
       return interacted ? null : 'desliza para elegir · toca para empezar';
     case 'paused':
-      return 'en pausa · mantén pulsado para reiniciar';
+      return 'mantén pulsado para reiniciar';
     case 'finished':
       return view.isCycle ? 'ciclos completados · toca para empezar' : 'toca para volver a empezar';
     default:
