@@ -15,8 +15,9 @@
  *
  * Grupos (1.5):
  *   [giro 180° del móvil volteado]
- *     [desenfoque de la pausa por tumbar]
- *       fondo · sombra · [EL RELOJ: cuerpo + arena + reflejos]
+ *     fondo
+ *     [desenfoque de la pausa, solo en la franja del reloj (1.8.1)]
+ *       sombra · [EL RELOJ: cuerpo + arena + reflejos]
  *     `children` (p. ej. el vidrio esmerilado del menú)
  *   [fundido del cambio de tema]
  *
@@ -31,7 +32,7 @@
  * con un pequeño retraso (ver disposal.ts). Nada vive a nivel de módulo.
  */
 import { SandSimulation, type ContentDefinition, type HourglassModel, type TimerStatus } from '@reloj/core';
-import { Blur, Canvas, Group, Image, Paint, Picture, useCanvasRef } from '@shopify/react-native-skia';
+import { Blur, Canvas, Group, Image, Paint, Picture, rect, useCanvasRef } from '@shopify/react-native-skia';
 import { memo, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 import { useDerivedValue, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
@@ -72,6 +73,8 @@ export interface HourglassPose {
  */
 export type PauseBlur = 'none' | 'soft' | 'full';
 const PAUSE_BLUR_PX: Record<PauseBlur, number> = { none: 0, soft: 2.5, full: 9 };
+/** Margen alrededor del reloj para que el desenfoque más fuerte no se corte (≈ 4σ). */
+const BLUR_MARGIN = 40;
 
 export interface HourglassProps {
   readonly width: number;
@@ -239,6 +242,16 @@ function HourglassCanvas({
     );
   }, [target, reduceMotion, blur]);
 
+  // El desenfoque solo cubre la franja del reloj y su sombra (1.8.1). El fondo
+  // es un degradado muy suave: desenfocado se ve igual, pero desenfocar toda
+  // la pantalla en cada fotograma costaba unas tres veces más en la GPU.
+  // Durante la introducción el reloj se mueve por la pantalla: sin recorte.
+  const blurClip = useMemo(() => {
+    const top = Math.max(0, layout.cy - layout.halfH - BLUR_MARGIN);
+    const bottom = Math.min(height, layout.cy + layout.halfH + BLUR_MARGIN + 0.3 * layout.halfH);
+    return rect(0, top, width, Math.max(0, bottom - top));
+  }, [layout, width, height]);
+
   const layer = blurLayerOn ? (
     <Paint>
       <Blur blur={blur} mode="clamp" />
@@ -252,8 +265,8 @@ function HourglassCanvas({
   return (
     <Canvas ref={canvasRef} style={{ width, height }}>
       <Group transform={transform} origin={origin}>
-        <Group layer={layer}>
-          <Picture picture={background} />
+        <Picture picture={background} />
+        <Group layer={layer} clip={blurLayerOn && !poseActive ? blurClip : undefined}>
           <Group layer={shadowLayer}>
             <Picture picture={shadow} />
           </Group>
