@@ -66,8 +66,7 @@ function makeSurface(w: number, h: number): SkSurface | null {
 export class FrostedBackdrop {
   private readonly w: number;
   private readonly h: number;
-  private scene: SkSurface | null = null;
-  private blurred: SkSurface | null = null;
+  private surface: SkSurface | null = null;
   private readonly blurPaint: SkPaint;
 
   constructor(
@@ -85,12 +84,13 @@ export class FrostedBackdrop {
 
   /** Dibuja la escena, la desenfoca y publica la foto nueva. */
   render(s: BackdropScene): void {
-    this.scene ??= makeSurface(this.w, this.h);
-    this.blurred ??= makeSurface(this.w, this.h);
-    if (!this.scene || !this.blurred) return;
+    this.surface ??= makeSurface(this.w, this.h);
+    if (!this.surface) return;
 
-    const c = this.scene.getCanvas();
-    c.save();
+    // Todo en UNA superficie: la escena se dibuja dentro de una capa con el
+    // desenfoque, que se aplica al cerrarla (restore).
+    const c = this.surface.getCanvas();
+    c.saveLayer(this.blurPaint);
     c.scale(BACKDROP_SCALE, BACKDROP_SCALE);
     c.drawPicture(s.background);
     c.drawPicture(s.shadow);
@@ -104,17 +104,13 @@ export class FrostedBackdrop {
     c.drawPicture(s.front);
     c.restore();
     c.restore();
-    const sharp = this.scene.makeImageSnapshot();
+    this.surface.flush();
 
-    const b = this.blurred.getCanvas();
-    b.drawImage(sharp, 0, 0, this.blurPaint);
-    this.blurred.flush();
     // La foto pasa a memoria normal: así la puede pintar el lienzo, que vive
     // en otro hilo (y otro contexto de GPU). Son ~80 KB.
-    const gpu = this.blurred.makeImageSnapshot();
+    const gpu = this.surface.makeImageSnapshot();
     const next = gpu.makeNonTextureImage();
     gpu.dispose();
-    sharp.dispose();
 
     const previous = this.target.value;
     this.target.value = next;
@@ -125,9 +121,8 @@ export class FrostedBackdrop {
   dispose(): void {
     const current = this.target.value;
     this.target.value = null;
-    disposeLater([current, this.scene, this.blurred]);
-    this.scene = null;
-    this.blurred = null;
+    disposeLater([current, this.surface]);
+    this.surface = null;
     safeDispose(this.blurPaint);
   }
 }

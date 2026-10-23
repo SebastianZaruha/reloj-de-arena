@@ -46,6 +46,9 @@ import { DARK_THEME, LIGHT_THEME } from '../../theme/theme';
 /** Radio de las esquinas superiores de la hoja. */
 export const SHEET_RADIUS = 30;
 /** La foto es pequeña: se estira con filtrado lineal (ya está desenfocada). */
+/** El tinte de cada tema, opaco (fondo de reserva del vidrio). */
+const BASE_LIGHT = 'rgb(236, 230, 222)';
+const BASE_DARK = 'rgb(38, 32, 27)';
 const SMOOTH = { filter: FilterMode.Linear, mipmap: MipmapMode.None } as const;
 /** Alto de la sombra sobre el canto. */
 const SHADOW_H = 28;
@@ -80,6 +83,9 @@ export function FrostedPanel({ width, height, top, openness, themeProgress, scen
   const tint = useDerivedValue(() =>
     interpolateColor(themeProgress.value, [0, 1], [L.panelTint, D.panelTint]),
   );
+  // Por si la foto no existe aún (o la GPU no la pudo hacer): el mismo tinte,
+  // opaco, para que nunca se vea el reloj nítido detrás del menú.
+  const base = useDerivedValue(() => interpolateColor(themeProgress.value, [0, 1], [BASE_LIGHT, BASE_DARK]));
   const edge = useDerivedValue(() =>
     interpolateColor(themeProgress.value, [0, 1], [L.panelEdge, D.panelEdge]),
   );
@@ -96,6 +102,7 @@ export function FrostedPanel({ width, height, top, openness, themeProgress, scen
         <LinearGradient start={shadowStart} end={shadowEnd} colors={shadowColors} />
       </Rect>
       <Group clip={shape}>
+        <Fill color={base} />
         <Image
           image={scene.backdrop}
           x={0}
