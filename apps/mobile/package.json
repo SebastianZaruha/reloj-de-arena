@@ -1,6 +1,6 @@
 {
   "name": "@reloj/mobile",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "private": true,
   "description": "App Expo / React Native del Reloj de Arena (Android, iOS y web).",
   "license": "MIT",
