@@ -123,6 +123,26 @@ export const es = {
   openSystemSettings: 'Abrir ajustes',
   alertsBlocked: 'Notificaciones desactivadas · toca para activarlas',
   exactAlarmsBlocked: 'Los avisos pueden llegar tarde · toca para arreglarlo',
+
+  // ─── Ventana flotante e imagen en imagen (1.8, Android) ───
+  floatingWindow: 'Ventana flotante',
+  /** Entradilla de la pantalla que explica la ventana flotante. */
+  floatingIntro:
+    'Con la app en segundo plano, el reloj se queda a la vista, pequeño, encima de las demás apps.',
+  floatingDrag: 'Arrástralo: se acomoda en el borde más cercano',
+  floatingPinch: 'Pellízcalo para hacerlo más grande o más pequeño',
+  floatingTap: 'Tócalo para volver a la app',
+  floatingHold: 'Mantenlo pulsado para pausar o seguir',
+  floatingDismiss: 'Llévalo a la × de abajo para quitarlo',
+  floatingPermission:
+    'Android pide permiso para «Mostrar sobre otras apps». Sin él, el reloj se verá en imagen en imagen.',
+  floatingAllow: 'Dar permiso',
+  closeFloatingHelp: 'Cerrar la explicación',
+  floatingPipNotice: 'Sin permiso se usa imagen en imagen · toca para darlo',
+  /** Para el lector de pantalla, sobre la ventana flotante (lo usa Android). */
+  floatingLabel: 'Reloj de arena flotante',
+  floatingHint: 'Toca para abrir la app. Mantén pulsado para pausar o seguir.',
+  floatingClose: 'Quitar la ventana flotante',
 };
 
 export type Messages = typeof es;
@@ -210,6 +230,22 @@ export const en: Messages = {
   openSystemSettings: 'Open settings',
   alertsBlocked: 'Notifications are off · tap to turn them on',
   exactAlarmsBlocked: 'Alerts may arrive late · tap to fix it',
+  floatingWindow: 'Floating window',
+  floatingIntro:
+    'With the app in the background, the hourglass stays in view, small, on top of your other apps.',
+  floatingDrag: 'Drag it: it settles at the nearest edge',
+  floatingPinch: 'Pinch it to make it bigger or smaller',
+  floatingTap: 'Tap it to go back to the app',
+  floatingHold: 'Press and hold to pause or resume',
+  floatingDismiss: 'Drag it to the × at the bottom to remove it',
+  floatingPermission:
+    'Android needs the "Display over other apps" permission. Without it, the hourglass will use picture-in-picture.',
+  floatingAllow: 'Grant permission',
+  closeFloatingHelp: 'Close the explanation',
+  floatingPipNotice: 'Without permission it uses picture-in-picture · tap to grant it',
+  floatingLabel: 'Floating hourglass',
+  floatingHint: 'Tap to open the app. Press and hold to pause or resume.',
+  floatingClose: 'Remove the floating window',
 };
 
 export const MESSAGES: Readonly<Record<Language, Messages>> = { es, en };
