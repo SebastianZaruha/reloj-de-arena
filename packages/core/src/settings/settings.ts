@@ -24,10 +24,11 @@ export type ThemePreference = 'system' | 'light' | 'dark';
 /**
  * Versión del esquema. 2 (app 1.5): añade sonido, modo de sesión y ciclos.
  * 3 (app 1.6): añade el idioma. 4 (app 1.7): recuerda si ya se pidió el
- * permiso de notificaciones. Los ajustes de versiones anteriores se
- * migran solos: lo que falta toma su valor por defecto en `sanitizeSettings`.
+ * permiso de notificaciones. 5 (app 1.8): ventana flotante. Los ajustes de
+ * versiones anteriores se migran solos: lo que falta toma su valor por
+ * defecto en `sanitizeSettings`.
  */
-export const SETTINGS_VERSION = 4;
+export const SETTINGS_VERSION = 5;
 
 export interface Settings {
   /** Versión del esquema, para migraciones futuras. */
@@ -55,6 +56,14 @@ export interface Settings {
    * solo se ofrece desde el menú (1.7, Android).
    */
   readonly alertsPermissionAsked: boolean;
+  /**
+   * Ventana flotante (1.8, Android): al salir de la app con el reloj en
+   * marcha, el reloj se queda encima de las demás apps (o, sin permiso, en
+   * imagen en imagen). Desactivada por defecto.
+   */
+  readonly floatingWindow: boolean;
+  /** ¿Ya se explicó la ventana flotante y su permiso? (pantalla que sale una vez) */
+  readonly floatingExplained: boolean;
   /** Sonido al terminar y al cambiar de fase (1.5). */
   readonly sound: boolean;
   /** Sesión única (un temporizador) o ciclos trabajo/descanso (1.5). */
@@ -79,6 +88,8 @@ export const DEFAULT_SETTINGS: Settings = Object.freeze({
   language: 'system',
   gesturesSeen: false,
   alertsPermissionAsked: false,
+  floatingWindow: false,
+  floatingExplained: false,
   haptics: true,
   sound: true,
   sessionMode: 'single',
@@ -112,6 +123,9 @@ export function sanitizeSettings(raw: unknown): Settings {
     gesturesSeen: r.gesturesSeen === true,
     // 1.7: ajustes anteriores → aún no se ha pedido.
     alertsPermissionAsked: r.alertsPermissionAsked === true,
+    // 1.8: ajustes anteriores → ventana flotante apagada y sin explicar.
+    floatingWindow: r.floatingWindow === true,
+    floatingExplained: r.floatingExplained === true,
     // Ajustes guardados por versiones anteriores no traen `haptics`: activada.
     haptics: typeof r.haptics === 'boolean' ? r.haptics : DEFAULT_SETTINGS.haptics,
     // Novedades de la 1.5: si no vienen (ajustes de la 1.4), valores por defecto.

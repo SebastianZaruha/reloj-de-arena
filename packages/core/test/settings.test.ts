@@ -55,7 +55,7 @@ describe('ajustes', () => {
     const old = { version: 1, lastDurationMs: 15 * MIN, theme: 'dark', haptics: false, updatedAt: 5 };
     const s = sanitizeSettings(old);
     expect(s).toMatchObject({
-      version: 4,
+      version: 5,
       lastDurationMs: 15 * MIN,
       language: 'system',
       theme: 'dark',
@@ -65,6 +65,20 @@ describe('ajustes', () => {
       cyclePreset: '25-5',
     });
     expect(s.customCycle).toEqual(DEFAULT_SETTINGS.customCycle);
+  });
+
+  it('ventana flotante (1.8): apagada y sin explicar por defecto; solo true cuenta', () => {
+    const fromV4 = sanitizeSettings({ version: 4, alertsPermissionAsked: true });
+    expect(fromV4).toMatchObject({ version: 5, floatingWindow: false, floatingExplained: false });
+    expect(sanitizeSettings({ floatingWindow: true, floatingExplained: true })).toMatchObject({
+      floatingWindow: true,
+      floatingExplained: true,
+    });
+    expect(sanitizeSettings({ floatingWindow: 'sí', floatingExplained: 1 })).toMatchObject({
+      floatingWindow: false,
+      floatingExplained: false,
+    });
+    expect(updateSettings(DEFAULT_SETTINGS, { floatingWindow: true }, 9).floatingWindow).toBe(true);
   });
 
   it('valida sonido, modo, preajuste y Personalizado (1.5)', () => {

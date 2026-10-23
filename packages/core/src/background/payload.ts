@@ -6,7 +6,8 @@
  *   - los textos ya traducidos: el título de cada tramo («Trabajo 1/4»,
  *     «Descanso 1/4» o «Temporizador»), el aviso de cada cambio de fase, el
  *     de fin, los botones y los nombres de los canales de notificación,
- *   - los interruptores «Sonido» y «Vibración» del menú.
+ *   - los interruptores «Sonido» y «Vibración» del menú,
+ *   - la ventana flotante (1.8): si está activada y el tema elegido.
  *
  * Algunos textos llevan la hora o el tiempo restante, que solo se sabe en el
  * momento de mostrarlos (p. ej. tras pausar desde la notificación con la app
@@ -14,6 +15,7 @@
  * módulo nativo la sustituye: «Hasta las {t}» → «Hasta las 17:25».
  */
 import type { Messages } from '../i18n/messages';
+import type { ThemePreference } from '../settings/settings';
 import { roundOfSegment, roundsInPlan } from '../session/cycles';
 import type { SessionState } from '../session/session';
 import {
@@ -49,6 +51,10 @@ export interface BackgroundTexts {
   readonly channelPhase: string;
   readonly channelSoundOnly: string;
   readonly channelVibrationOnly: string;
+  /** Ventana flotante, para el lector de pantalla (1.8). */
+  readonly floatingLabel: string;
+  readonly floatingHint: string;
+  readonly floatingClose: string;
 }
 
 export interface BackgroundPayload {
@@ -59,6 +65,10 @@ export interface BackgroundPayload {
   readonly texts: BackgroundTexts;
   readonly sound: boolean;
   readonly vibration: boolean;
+  /** ¿Mostrar la ventana flotante al salir de la app con el reloj en marcha? (1.8) */
+  readonly floating: boolean;
+  /** Tema para la ventana flotante: Android resuelve «Automático» con el del sistema. */
+  readonly theme: ThemePreference;
   /**
    * Último cambio hecho desde la notificación que la app ya conoce. Si el
    * módulo nativo tiene uno más nuevo, rechaza este envío (es de antes).
@@ -70,6 +80,9 @@ export interface BackgroundOptions {
   readonly sound: boolean;
   readonly vibration: boolean;
   readonly seenSeq: number;
+  /** Ventana flotante (1.8); sin decir nada, apagada y con el tema automático. */
+  readonly floating?: boolean;
+  readonly theme?: ThemePreference;
 }
 
 /** Monta el envío al módulo nativo para la sesión en `now`. */
@@ -97,6 +110,8 @@ export function backgroundPayload(
     texts: backgroundTexts(tr, isCycle),
     sound: options.sound,
     vibration: options.vibration,
+    floating: options.floating ?? false,
+    theme: options.theme ?? 'system',
     seenSeq: options.seenSeq,
   };
 }
@@ -115,5 +130,8 @@ function backgroundTexts(tr: Messages, isCycle: boolean): BackgroundTexts {
     channelPhase: tr.channelPhase,
     channelSoundOnly: tr.channelSoundOnly,
     channelVibrationOnly: tr.channelVibrationOnly,
+    floatingLabel: tr.floatingLabel,
+    floatingHint: tr.floatingHint,
+    floatingClose: tr.floatingClose,
   };
 }

@@ -253,6 +253,15 @@ describe('segundo plano: lo que se envía al módulo nativo', () => {
     expect(backgroundPayload(s, T0, en, options).texts.finishedTitle).toBe("Time's up");
   });
 
+  it('ventana flotante (1.8): apagada y tema automático si no se dice; si no, lo elegido', () => {
+    const off = backgroundPayload(running(), T0, es, options);
+    expect(off).toMatchObject({ floating: false, theme: 'system' });
+    const on = backgroundPayload(running(), T0, en, { ...options, floating: true, theme: 'dark' });
+    expect(on).toMatchObject({ floating: true, theme: 'dark' });
+    expect(on.texts.floatingLabel).toBe('Floating hourglass');
+    expect(off.texts.floatingClose).toBe('Quitar la ventana flotante');
+  });
+
   it('en reposo no lleva sesión ni avisos (el módulo lo quita todo)', () => {
     const p = backgroundPayload(createSession(plan), T0, es, options);
     expect(p.session).toBeNull();
