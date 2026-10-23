@@ -7,13 +7,13 @@ plugins {
 }
 
 group = 'com.sebastianzaruha.relojdearena'
-version = '1.8.1'
+version = '1.8.2'
 
 android {
   namespace "com.sebastianzaruha.relojdearena.background"
   defaultConfig {
     versionCode 1
-    versionName '1.8.1'
+    versionName '1.8.2'
   }
   testOptions {
     // Robolectric necesita los recursos de Android para dibujar en la JVM.
