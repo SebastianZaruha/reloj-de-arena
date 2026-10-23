@@ -94,6 +94,12 @@ interface Props {
   readonly onShowGestures: () => void;
   /** Falta un permiso de los avisos en segundo plano (1.7, Android): texto y arreglo. */
   readonly alertsNotice?: AlertsNotice | null;
+  /** Interruptor «Ventana flotante» (1.8, solo Android con el módulo nativo). */
+  readonly floating?: {
+    readonly value: boolean;
+    readonly onChange: (on: boolean) => void;
+    readonly notice: AlertsNotice | null;
+  } | null;
 }
 
 export function SettingsSheet({
@@ -108,6 +114,7 @@ export function SettingsSheet({
   safeBottom,
   onShowGestures,
   alertsNotice = null,
+  floating = null,
 }: Props) {
   const t = useT();
   const s = useMenuStyles(themeProgress);
@@ -388,19 +395,35 @@ export function SettingsSheet({
                 testID="interruptor-vibracion"
               />
             </View>
-            {/* Solo si falta un permiso: una línea discreta que lo arregla. */}
-            {alertsNotice ? (
-              <Pressable
-                onPress={alertsNotice.onPress}
-                accessibilityRole="button"
-                style={({ pressed }) => [styles.notice, pressed && styles.helpPressed]}
-                testID="aviso-permisos"
-              >
-                <Animated.Text style={[styles.noticeText, { fontFamily: fonts.medium }, s.inkSoft]}>
-                  {alertsNotice.text}
-                </Animated.Text>
-              </Pressable>
+            {/* Ventana flotante (Android): el reloj encima de otras apps al salir. */}
+            {floating ? (
+              <>
+                <Animated.View style={[styles.hline, styles.floatingLine, s.lineBg]} />
+                <ToggleRow
+                  {...base}
+                  label={t.floatingWindow}
+                  value={floating.value}
+                  onChange={floating.onChange}
+                  testID="interruptor-flotante"
+                />
+              </>
             ) : null}
+            {/* Solo si falta un permiso: una línea discreta que lo arregla. */}
+            {[alertsNotice, floating?.notice ?? null].map((notice, i) =>
+              notice ? (
+                <Pressable
+                  key={i}
+                  onPress={notice.onPress}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [styles.notice, pressed && styles.helpPressed]}
+                  testID={i === 0 ? 'aviso-permisos' : 'aviso-flotante'}
+                >
+                  <Animated.Text style={[styles.noticeText, { fontFamily: fonts.medium }, s.inkSoft]}>
+                    {notice.text}
+                  </Animated.Text>
+                </Pressable>
+              ) : null,
+            )}
           </View>
         </ScrollView>
       </GestureDetector>
@@ -491,6 +514,7 @@ const styles = StyleSheet.create({
   vline: { width: StyleSheet.hairlineWidth, marginVertical: 14 },
   cycleSummary: { fontSize: 12, textAlign: 'center', marginTop: 9, letterSpacing: 0.2 },
   hline: { height: StyleSheet.hairlineWidth },
+  floatingLine: { marginTop: 2 },
   toggles: { flexDirection: 'row', alignItems: 'center', paddingTop: 2 },
   toggle: { flex: 1 },
   toggleDivider: { width: StyleSheet.hairlineWidth, height: 26, marginHorizontal: 20 },

@@ -20,6 +20,7 @@ import {
   type BackgroundSession,
   type Messages,
   type SessionPlan,
+  type ThemePreference,
   type SessionState,
 } from '@reloj/core';
 
@@ -79,6 +80,9 @@ export function pendingNativeChange(plan: SessionPlan, now: number): SessionStat
 export interface SyncOptions {
   readonly sound: boolean;
   readonly vibration: boolean;
+  /** Ventana flotante activada y tema elegido (1.8). */
+  readonly floating: boolean;
+  readonly theme: ThemePreference;
   /** Fuerza el envío aunque no haya cambiado nada (p. ej. tras dar un permiso). */
   readonly force?: boolean;
 }
@@ -95,7 +99,13 @@ export function syncBackground(
 ): boolean {
   if (!BackgroundTimer) return true;
   const json = JSON.stringify(
-    backgroundPayload(state, now, tr, { sound: options.sound, vibration: options.vibration, seenSeq }),
+    backgroundPayload(state, now, tr, {
+      sound: options.sound,
+      vibration: options.vibration,
+      floating: options.floating,
+      theme: options.theme,
+      seenSeq,
+    }),
   );
   if (json === lastSent && !options.force) return true;
   try {

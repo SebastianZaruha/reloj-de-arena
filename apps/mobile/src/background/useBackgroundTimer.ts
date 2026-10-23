@@ -6,7 +6,8 @@
  *
  * Cuándo se envía el estado al módulo nativo: cada vez que cambia la sesión
  * (empezar, pausar, reanudar, voltear, reiniciar, cambio de fase, otro plan
- * desde el menú) o el idioma, el sonido o la vibración. No en cada refresco:
+ * desde el menú) o el idioma, el sonido, la vibración, la ventana flotante o
+ * el tema. No en cada refresco:
  * el cronómetro de la notificación lo cuenta Android solo.
  */
 import type { Messages, Settings } from '@reloj/core';
@@ -27,12 +28,12 @@ export interface AlertsNotice {
   readonly onPress: () => void;
 }
 
-const ALL_GRANTED: BackgroundPermissions = { notifications: true, exactAlarms: true };
+const ALL_GRANTED: BackgroundPermissions = { notifications: true, exactAlarms: true, overlay: true };
 
 /** El permiso de notificaciones se pide en tiempo de ejecución desde Android 13. */
 const NEEDS_RUNTIME_PERMISSION = Platform.OS === 'android' && Number(Platform.Version) >= 33;
 
-function readPermissions(): BackgroundPermissions {
+export function readPermissions(): BackgroundPermissions {
   try {
     return BackgroundTimer?.getPermissions() ?? ALL_GRANTED;
   } catch {
@@ -73,7 +74,13 @@ export function useBackgroundTimer({ session, settings, update, tr }: Options): 
     /** Envía el estado actual; si el módulo lo rechaza, primero se pone al día. */
     const send = (force = false) => {
       const { session: s, settings: p, tr: t } = latest.current;
-      const options = { sound: p.sound, vibration: p.haptics, force };
+      const options = {
+        sound: p.sound,
+        vibration: p.haptics,
+        floating: p.floatingWindow,
+        theme: p.theme,
+        force,
+      };
       if (syncBackground(s.state, appClock.now(), t, options)) return;
       catchUp();
       // Con la sesión de la notificación (o, si no se pudo aplicar, la de la app).
@@ -83,7 +90,11 @@ export function useBackgroundTimer({ session, settings, update, tr }: Options): 
     const refresh = () => {
       const now = readPermissions();
       const old = latest.current.permissions;
-      if (now.notifications !== old.notifications || now.exactAlarms !== old.exactAlarms) {
+      if (
+        now.notifications !== old.notifications ||
+        now.exactAlarms !== old.exactAlarms ||
+        now.overlay !== old.overlay
+      ) {
         setPermissions(now);
       }
       // Forzado: en Android 14+ la notificación se puede descartar deslizando y así vuelve.
@@ -115,12 +126,13 @@ export function useBackgroundTimer({ session, settings, update, tr }: Options): 
     };
   }, [actions]);
 
-  // Cada cambio de la sesión, del idioma o de los interruptores → notificación.
+  // Cada cambio de la sesión, del idioma, de los interruptores o del tema →
+  // notificación (y ventana flotante).
   // (Va después del efecto de arriba: al arrancar, el módulo ya sabe que la
   // app está a la vista y no repite avisos atrasados.)
   useEffect(() => {
     actions.send();
-  }, [session.state, tr, settings.sound, settings.haptics, actions]);
+  }, [session.state, tr, settings.sound, settings.haptics, settings.floatingWindow, settings.theme, actions]);
 
   // Al empezar el PRIMER reloj se explica y se pide el permiso (una sola vez).
   const askNow =

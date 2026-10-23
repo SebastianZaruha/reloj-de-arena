@@ -78,7 +78,9 @@ import { useDerivedValue, useReducedMotion, useSharedValue, withTiming } from 'r
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useBackgroundTimer } from '../background/useBackgroundTimer';
+import { useFloatingWindow } from '../background/useFloatingWindow';
 import { appShouldAlert } from '../background/visibility';
+import { FloatingHelp } from '../components/FloatingHelp';
 import { GesturesHelp } from '../components/GesturesHelp';
 import { HourglassBoundary } from '../components/HourglassBoundary';
 import { FrostedPanel } from '../components/menu/FrostedPanel';
@@ -167,6 +169,10 @@ export function TimerScreen({ settings, fonts }: Props) {
   // Notificación con la cuenta atrás y avisos con la app cerrada (Android).
   // Devuelve un aviso para el menú si falta algún permiso.
   const alertsNotice = useBackgroundTimer({ session, settings: prefs, update: settings.update, tr });
+  // Ventana flotante e imagen en imagen (1.8, Android). En imagen en imagen
+  // (`pip`) la pantalla muestra solo el reloj.
+  const floating = useFloatingWindow(prefs, settings.update, tr);
+  const pip = floating.pip;
 
   // Avisos: cambio de fase y fin (sonido, vibración y lector de pantalla).
   const playCue = useCueSound(prefs.sound);
@@ -212,9 +218,20 @@ export function TimerScreen({ settings, fonts }: Props) {
     if (!prefs.gesturesSeen) settings.update({ gesturesSeen: true });
   };
   const closeGestures = useCallback(() => setHelpOpen(false), []);
+  // Una pantalla informativa encima (gestos o ventana flotante): reloj desenfocado, sin gestos.
+  const infoOpen = helpOpen || floating.introOpen;
   useEffect(() => {
-    helpFade.set(withTiming(helpOpen ? 1 : 0, { duration: reduceMotion ? 0 : 260 }));
-  }, [helpOpen, reduceMotion, helpFade]);
+    helpFade.set(withTiming(infoOpen ? 1 : 0, { duration: reduceMotion ? 0 : 260 }));
+  }, [infoOpen, reduceMotion, helpFade]);
+  /** Interruptor del menú: si sale la explicación, el menú se cierra para dejarla ver. */
+  const toggleFloating = (on: boolean) => {
+    if (floating.toggle(on)) sheet.hide();
+  };
+  // Al entrar en imagen en imagen, el menú no cabe: se cierra.
+  useEffect(() => {
+    if (pip) sheet.hide();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pip]);
   // Primer arranque: al terminar la entrada, se muestra sola (y queda
   // guardado que ya se vio, aunque se cierre la app sin cerrarla).
   const autoHelp = !prefs.gesturesSeen && !intro.active;
@@ -266,7 +283,7 @@ export function TimerScreen({ settings, fonts }: Props) {
   // dedo (desenfoque ligero, rótulo derecho). En las dos, «Pausa» grande.
   const paused = view.status === 'paused';
   const blurred = tiltPaused && paused;
-  const pauseBlur: PauseBlur = helpOpen || blurred ? 'full' : paused ? 'soft' : 'none';
+  const pauseBlur: PauseBlur = infoOpen || blurred ? 'full' : paused ? 'soft' : 'none';
 
   // ─── Elegir el tiempo (deslizar y TalkBack) ─────────────────────────────
   /** Duración que se ajusta: la de la sesión única o el TRABAJO de los ciclos. */
@@ -293,7 +310,7 @@ export function TimerScreen({ settings, fonts }: Props) {
   ticker.current ??= new StepTicker();
   // Con el menú abierto, los gestos del reloj se apagan (además, el velo y
   // la hoja lo tapan, así que tampoco recibirían toques).
-  const gesturesOn = !sheet.open && !helpOpen;
+  const gesturesOn = !sheet.open && !infoOpen;
 
   // Zona de guarda del botón del menú (1.6): un toque, una pulsación larga o
   // un deslizamiento que EMPIEZA en la esquina del botón no llega al reloj.
@@ -402,9 +419,10 @@ export function TimerScreen({ settings, fonts }: Props) {
   };
 
   // ─── Diseño ─────────────────────────────────────────────────────────────
+  // En imagen en imagen no hay textos ni menú: el reloj ocupa toda la ventanita.
   const insets = useMemo(
-    () => ({ top: safe.top + 12, bottom: safe.bottom + BOTTOM_AREA }),
-    [safe.top, safe.bottom],
+    () => (pip ? PIP_INSETS : { top: safe.top + 12, bottom: safe.bottom + BOTTOM_AREA }),
+    [pip, safe.top, safe.bottom],
   );
   const displayMs = view.status === 'idle' ? view.durationMs : view.remainingMs;
   const hint = blurred ? null : hintFor(view, interacted, tr);
@@ -433,8 +451,8 @@ export function TimerScreen({ settings, fonts }: Props) {
           ]}
           onAccessibilityAction={onAccessibilityAction}
           // Con el menú abierto, el lector de pantalla solo ve el menú.
-          importantForAccessibility={sheet.open || helpOpen ? 'no-hide-descendants' : 'auto'}
-          accessibilityElementsHidden={sheet.open || helpOpen}
+          importantForAccessibility={sheet.open || infoOpen ? 'no-hide-descendants' : 'auto'}
+          accessibilityElementsHidden={sheet.open || infoOpen}
           testID="reloj"
         >
           <HourglassBoundary onReload={() => saveSessionAndReload(latest.current.state)}>
@@ -468,75 +486,98 @@ export function TimerScreen({ settings, fonts }: Props) {
         </View>
       </GestureDetector>
 
-      <View style={[StyleSheet.absoluteFill, overlayStyle]} pointerEvents="none">
-        <PauseLabel
-          visible={paused}
-          sideSign={blurred ? tilt.sideSign : 0}
-          theme={theme}
-          font={fonts.time}
-          text={tr.paused}
-          reduceMotion={reduceMotion}
-        />
-        <TimeDisplay
-          text={formatDuration(displayMs)}
-          hint={hint}
-          label={label}
-          // Con el móvil volteado la capa gira 180°: su "abajo" es el borde
-          // superior físico de la pantalla, así que usamos el margen seguro
-          // de arriba (muesca/cámara) en lugar del de abajo.
-          bottom={(tilt.flipped ? safe.top : safe.bottom) + TIME_BOTTOM}
-          fonts={timeFonts}
-          themeProgress={themeProgress}
-          opacity={timeOpacity}
-        />
-      </View>
-
-      <View style={[StyleSheet.absoluteFill, overlayStyle]} pointerEvents="box-none">
-        {sheet.visible ? (
-          // Velo invisible: tocar fuera de la hoja la cierra (y protege al
-          // reloj de toques sin querer). El lector de pantalla usa el asa.
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={sheet.hide}
-            importantForAccessibility="no"
-            accessibilityElementsHidden
-            testID="velo-ajustes"
+      {pip ? null : (
+        <View style={[StyleSheet.absoluteFill, overlayStyle]} pointerEvents="none">
+          <PauseLabel
+            visible={paused}
+            sideSign={blurred ? tilt.sideSign : 0}
+            theme={theme}
+            font={fonts.time}
+            text={tr.paused}
+            reduceMotion={reduceMotion}
           />
-        ) : null}
-        <SettingsSheet
-          sheet={sheet}
-          settings={prefs}
-          update={settings.update}
-          theme={theme}
-          themeProgress={themeProgress}
-          fonts={fonts}
-          screenHeight={height}
-          safeTop={tilt.flipped ? safe.bottom : safe.top}
-          safeBottom={tilt.flipped ? safe.top : safe.bottom}
-          onShowGestures={showGestures}
-          alertsNotice={alertsNotice}
-        />
-        <MenuButton
-          top={(tilt.flipped ? safe.bottom : safe.top) + 8}
-          expanded={sheet.open}
-          onPress={toggleMenu}
-          opacity={buttonOpacity}
-          themeProgress={themeProgress}
-        />
-        <GesturesHelp
-          visible={helpOpen}
-          onClose={closeGestures}
-          theme={theme}
-          themeProgress={themeProgress}
-          fonts={fonts}
-          safeTop={tilt.flipped ? safe.bottom : safe.top}
-          safeBottom={tilt.flipped ? safe.top : safe.bottom}
-          reduceMotion={reduceMotion}
-        />
-      </View>
+          <TimeDisplay
+            text={formatDuration(displayMs)}
+            hint={hint}
+            label={label}
+            // Con el móvil volteado la capa gira 180°: su "abajo" es el borde
+            // superior físico de la pantalla, así que usamos el margen seguro
+            // de arriba (muesca/cámara) en lugar del de abajo.
+            bottom={(tilt.flipped ? safe.top : safe.bottom) + TIME_BOTTOM}
+            fonts={timeFonts}
+            themeProgress={themeProgress}
+            opacity={timeOpacity}
+          />
+        </View>
+      )}
+
+      {pip ? null : (
+        <View style={[StyleSheet.absoluteFill, overlayStyle]} pointerEvents="box-none">
+          {sheet.visible ? (
+            // Velo invisible: tocar fuera de la hoja la cierra (y protege al
+            // reloj de toques sin querer). El lector de pantalla usa el asa.
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={sheet.hide}
+              importantForAccessibility="no"
+              accessibilityElementsHidden
+              testID="velo-ajustes"
+            />
+          ) : null}
+          <SettingsSheet
+            sheet={sheet}
+            settings={prefs}
+            update={settings.update}
+            theme={theme}
+            themeProgress={themeProgress}
+            fonts={fonts}
+            screenHeight={height}
+            safeTop={tilt.flipped ? safe.bottom : safe.top}
+            safeBottom={tilt.flipped ? safe.top : safe.bottom}
+            onShowGestures={showGestures}
+            alertsNotice={alertsNotice}
+            floating={
+              floating.available
+                ? { value: floating.enabled, onChange: toggleFloating, notice: floating.notice }
+                : null
+            }
+          />
+          <MenuButton
+            top={(tilt.flipped ? safe.bottom : safe.top) + 8}
+            expanded={sheet.open}
+            onPress={toggleMenu}
+            opacity={buttonOpacity}
+            themeProgress={themeProgress}
+          />
+          <GesturesHelp
+            visible={helpOpen}
+            onClose={closeGestures}
+            theme={theme}
+            themeProgress={themeProgress}
+            fonts={fonts}
+            safeTop={tilt.flipped ? safe.bottom : safe.top}
+            safeBottom={tilt.flipped ? safe.top : safe.bottom}
+            reduceMotion={reduceMotion}
+          />
+          <FloatingHelp
+            visible={floating.introOpen}
+            onClose={floating.closeIntro}
+            onAllow={floating.allow}
+            theme={theme}
+            themeProgress={themeProgress}
+            fonts={fonts}
+            safeTop={tilt.flipped ? safe.bottom : safe.top}
+            safeBottom={tilt.flipped ? safe.top : safe.bottom}
+            reduceMotion={reduceMotion}
+          />
+        </View>
+      )}
     </View>
   );
 }
+
+/** Márgenes del reloj en imagen en imagen (una ventanita sin textos). */
+const PIP_INSETS = { top: 6, bottom: 6 };
 
 /** «Trabajo 2/4» / «Work 2/4». */
 function phaseLabel(view: SessionSnapshot, tr: Messages): string {
