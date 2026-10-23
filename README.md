@@ -19,20 +19,22 @@ grano, se desliza al inclinar el móvil y empieza de nuevo al darle la vuelta.**
 <p align="center"><sub>Capturas de la versión web (Chromium, 390×844): en marcha en claro y oscuro, e inclinado 25°.</sub></p>
 
 <p align="center">
-  <img src="docs/capturas/14-menu-claro.png" width="22%" alt="Menú de ajustes abierto, tema claro" />
-  <img src="docs/capturas/14-menu-oscuro.png" width="22%" alt="Menú de ajustes abierto, tema oscuro, con ciclos" />
-  <img src="docs/capturas/14-ciclo-descanso-oscuro.png" width="22%" alt="Ciclo en marcha: Descanso 2/4" />
-  <img src="docs/capturas/14-intro-claro.png" width="22%" alt="Animación de entrada: el reloj gira" />
+  <img src="docs/capturas/17-menu-es-claro.png" width="22%" alt="Menú de ajustes abierto, tema claro" />
+  <img src="docs/capturas/17-menu-es-oscuro.png" width="22%" alt="Menú de ajustes abierto, tema oscuro, con ciclos" />
+  <img src="docs/capturas/17-ciclo-es-oscuro.png" width="22%" alt="Ciclo en marcha: Descanso 2/4" />
+  <img src="docs/capturas/17-pausa-es-claro.png" width="22%" alt="Pausa con el dedo: «Pausa» centrado" />
 </p>
 
-<p align="center"><sub>Versión 1.5: menú de ajustes en claro y oscuro, un ciclo en su descanso y un fotograma de la entrada.</sub></p>
+<p align="center"><sub>Menú de ajustes en claro y oscuro, un ciclo en su descanso y la pausa con el dedo.</sub></p>
 
 <p align="center">
-  <img src="docs/capturas/15-pausa-toque-claro.png" width="28%" alt="Pausa con el dedo, tema claro: «Pausa» centrado" />
-  <img src="docs/capturas/15-pausa-toque-oscuro.png" width="28%" alt="Pausa con el dedo, tema oscuro, en un ciclo" />
+  <img src="docs/capturas/17-menu-en-claro.png" width="22%" alt="Settings menu in English, light theme" />
+  <img src="docs/capturas/17-ciclo-en-claro.png" width="22%" alt="Cycle running in English: Work 2/4" />
+  <img src="docs/capturas/17-pausa-en-oscuro.png" width="22%" alt="Tap pause in English: «Paused»" />
+  <img src="docs/capturas/16-gestos-es-claro.png" width="22%" alt="Ayuda de gestos" />
 </p>
 
-<p align="center"><sub>Versión 1.6: la pausa con el dedo muestra «Pausa» grande, centrado, con un desenfoque ligero.</sub></p>
+<p align="center"><sub>Versión 1.6: en inglés (menú, ciclo y pausa) y la ayuda de gestos. Todas las capturas, en claro y oscuro y en los dos idiomas, están en <code>docs/capturas/17-*</code> y <code>16-gestos-*</code>.</sub></p>
 
 ## Índice
 

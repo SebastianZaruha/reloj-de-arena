@@ -17,9 +17,9 @@ configurables y una entrada animada. **No hay cambios nativos:** sigue valiendo 
 desarrollo de la 1.3.
 
 <p align="center">
-  <img src="docs/capturas/14-menu-claro.png" width="22%" alt="Menú abierto, tema claro" />
-  <img src="docs/capturas/14-menu-oscuro.png" width="22%" alt="Menú abierto, tema oscuro" />
-  <img src="docs/capturas/14-ciclo-trabajo-claro.png" width="22%" alt="Ciclo: Trabajo 2/4" />
+  <img src="docs/capturas/17-menu-es-claro.png" width="22%" alt="Menú abierto, tema claro" />
+  <img src="docs/capturas/17-menu-es-oscuro.png" width="22%" alt="Menú abierto, tema oscuro" />
+  <img src="docs/capturas/17-ciclo-es-claro.png" width="22%" alt="Ciclo: Trabajo 2/4" />
   <img src="docs/capturas/14-intro-claro.png" width="22%" alt="Entrada animada" />
 </p>
 
@@ -154,7 +154,8 @@ insignificantes. 0 errores en la consola.
 
 - `12-hora-reposo-claro.png`, `12-hora-reposo-oscuro.png`, `12-hora-en-marcha-claro.png`,
   `12-hora-en-marcha-oscuro.png`: el tiempo más arriba (1.3.1).
-- `12-pausa-claro.png`, `12-pausa-oscuro.png`: el rótulo «Pausa» nuevo.
+- `12-pausa-claro.png`, `12-pausa-oscuro.png`: el rótulo «Pausa» nuevo (retiradas en la 1.6;
+  las actuales son `17-pausa-*`).
 - `13-en-marcha-claro.png`, `13-en-marcha-oscuro.png`: pantalla completa con el pulido.
 - `13-detalle-vidrio-claro.png`, `13-detalle-vidrio-oscuro.png`: de cerca (cuello, canto,
   tonos de los granos).
