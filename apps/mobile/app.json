@@ -2,7 +2,7 @@
   "expo": {
     "name": "Reloj de Arena",
     "slug": "reloj-de-arena",
-    "version": "1.8.0",
+    "version": "1.8.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
