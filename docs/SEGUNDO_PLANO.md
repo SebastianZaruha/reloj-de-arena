@@ -217,6 +217,9 @@ cd apps/mobile/android
     ejecuta en segundo plano».
   - No se ve sobre la pantalla de bloqueo.
   - `SYSTEM_ALERT_WINDOW`: Google Play lo revisa al publicar; aquí solo se usa si lo activas.
+- **Sin sensor fuera de la app:** con la ventana flotante, en imagen en imagen o en segundo
+  plano el acelerómetro está apagado, así que voltear el móvil no reinicia el reloj (batería y
+  bolsillos). Vuelve a funcionar al abrir la app.
 - **Imagen en imagen:** sin botones propios (Android pone los suyos); al terminar el reloj se
   queda mostrando el reloj vacío hasta que la cierras.
 - La primera vez, los tests de dibujo (Robolectric) descargan sus librerías: necesitan red.

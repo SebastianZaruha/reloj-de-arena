@@ -252,6 +252,10 @@ Todo respeta **reducir movimiento** (los destellos y los reflejos dependen de la
 - App: `src/motion/` (acelerómetro → `LiveMotion`; simulador de teclado para la web),
   `src/haptics/`, `components/PauseLabel.tsx`, y en `hourglass/` el `GlassPainter`
   (vidrio y sombra que se regraban baratos cuando cambia la luz) y `pictureSlot.ts`.
+- **Solo con la app delante:** el acelerómetro se apaga en cuanto la app deja de estar en
+  primer plano (`AppState`, en `useDeviceTilt`). Con la ventana flotante, en imagen en imagen
+  o en segundo plano **voltear no reinicia** ni tumbar pausa: ahorra batería y evita reinicios
+  sin querer con el móvil en el bolsillo. Es una decisión, no un fallo.
 - La pantalla **no se re-renderiza** con cada muestra del sensor: el sensor escribe en un
   objeto que el bucle de animación lee en cada fotograma; React solo se entera de los eventos
   (pausa, volteo).
@@ -370,24 +374,31 @@ constante se ignora.
 ### 10. Menú de ajustes
 
 ```
- MenuButton (dos rayas, 84×84) ──► useSheet.show() ──► offset: alto → 0 (340 ms)
+ MenuButton (dos rayas, 84×84) ──► useSheet.toggle() ──► offset: alto → 0 (340 ms)
                                         │
           ┌─────────────────────────────┴──────────────────────────┐
           ▼                                                        ▼
  FrostedPanel (Skia, DENTRO del lienzo del reloj)       SettingsSheet (React Native, encima)
- velo + sombra + reloj desenfocado + tinte + filo        secciones, controles, arrastre
+ velo + sombra + BackdropBlur + tinte + filo de luz      secciones, controles, arrastre
           └──────────── los dos leen el mismo shared value `offset` ────────────┘
 ```
 
-- **Vidrio esmerilado sin dependencias nuevas:** dentro de la forma de la hoja se dibuja el
-  fondo, una **copia desenfocada** (radio 26) de la sombra y el reloj, y el tinte. Tiene que
-  estar **dentro del mismo `<Canvas>`** que el reloj: `<Hourglass>` acepta como `children`
-  una función que recibe su escena (`HourglassScene`). Hasta la 1.8 era un `BackdropBlur`,
-  que lee la pantalla ya dibujada: en las GPU de los móviles eso parte cada fotograma en dos y
-  es lo más caro de todo. Se ve igual (diferencia ≤ 5/255 en capturas). En la web se sigue
-  usando `BackdropBlur`, que allí es más barato.
+- **Vidrio esmerilado sin dependencias nuevas:** el desenfoque es un `BackdropBlur` de Skia
+  (radio 26) recortado a la forma de la hoja. Tiene que estar **dentro del mismo `<Canvas>`**
+  que el reloj para poder desenfocar lo que hay debajo; por eso `<Hourglass>` acepta `children`.
+  Solo se monta mientras la hoja se ve (montado costaría en cada fotograma). Detrás, el reloj
+  sigue vivo: la arena cae y se ve moverse a través del vidrio.
+  Historia: la 1.8.1 lo cambió por una copia desenfocada del reloj dibujada dentro de la hoja
+  (para no leer la pantalla), y en un Samsung A55 la hoja tardaba ~2 s en salir, también nada
+  más abrir la app: al abrir, la GPU tenía que preparar versiones nuevas de los shaders del
+  vidrio dentro de una capa desenfocada. En la 1.8.2 volvió el `BackdropBlur` de la 1.6, que
+  en ese móvil siempre fue fluido; los tirones de la 1.8 venían de otras cosas (ver 1.8.1).
   Encima, transparente, va el contenido en React Native. Como los dos se mueven con el mismo
   shared value (`offset`), van pegados al píxel, también al arrastrar.
+- **El botón no se «rebota» (1.8.2):** `SheetToggle` (core) guarda si la hoja está abierta al
+  momento y, mientras se anima, ignora los toques del botón. Abrir una hoja abierta no hace
+  nada. «Pausa» se apaga mientras la hoja o una ayuda está delante (su vidrio está en el
+  lienzo, por debajo del rótulo).
 - **Abrir / cerrar:** botón; tocar fuera (un velo `Pressable` transparente); arrastrar hacia
   abajo desde cualquier sitio (cierra si se arrastra más del 22 % del alto o rápido, si no
   vuelve a su sitio); el botón «atrás» de Android (`BackHandler`) o Escape en la web.

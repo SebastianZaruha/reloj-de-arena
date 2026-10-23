@@ -9,6 +9,68 @@ funcionamiento interno en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md).
 > APK de desarrollo. A partir de la publicación en GitHub basta con `git pull`; las
 > instrucciones «Cómo actualizar» se conservan como referencia.
 
+## 1.8.2 — El menú se abre al primer toque
+
+Con la 1.8.1, en el Samsung A55 el botón del menú se iluminaba al tocarlo, pero la hoja salía
+unos 2 s después; con los toques de más se cerraba sola o había que tocar muchas veces, y una
+vez se vio el reloj encima del menú un segundo. Además, en pausa, «Pausa» salía encima del menú.
+**Hay que instalar el APK nuevo** (solo cambia JavaScript, pero el APK lo lleva dentro).
+
+### Qué lo causaba
+
+1. **El vidrio nuevo de la 1.8.1.** En la 1.6 el vidrio era un `BackdropBlur` y en el A55 abría
+   y cerraba fluido. La 1.8.1 lo cambió, **solo en Android**, por una copia desenfocada del reloj
+   dibujada dentro de la hoja (para no leer la pantalla). Esa copia mete los shaders del vidrio y
+   la arena en una capa desenfocada con el recorte redondeado de la hoja: al abrir, la GPU tenía
+   que preparar programas nuevos, también nada más arrancar con el reloj quieto. Mientras, el
+   contenido de la hoja (React Native) ya estaba encima, sin vidrio: por eso se vio el reloj
+   «encima» del menú. En la web seguía el `BackdropBlur`, así que las pruebas web no lo veían.
+2. **Cada toque de más invertía la hoja.** El botón decidía abrir o cerrar con el estado del
+   último render de React; con la hoja tardando, el segundo toque la cerraba, el tercero la
+   abría… De ahí los «20 toques».
+3. **«Pausa» encima del menú:** el vidrio de la hoja se pinta en el lienzo, por debajo de la
+   capa del rótulo, y el contenido de la hoja es transparente.
+
+### Qué cambia
+
+| Qué     | Cómo                                                                                                                                                                                               | Dónde                               |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Vidrio  | Vuelve el `BackdropBlur` de la 1.6, en Android y en la web, montado solo mientras la hoja se ve. Detrás, la arena sigue cayendo en vivo. Lo que hacía ir a tirones la 1.8 ya se quitó en la 1.8.1. | `FrostedPanel`, `TimerScreen.tsx`   |
+| Botón   | Abrir una hoja abierta no hace nada y, mientras la hoja se mueve, el botón ignora los toques.                                                                                                      | `SheetToggle` (core), `useSheet.ts` |
+| «Pausa» | Se apaga con la hoja o una ayuda (Gestos, ventana flotante) delante y vuelve al cerrarlas, en las dos pausas.                                                                                      | `TimerScreen.tsx`                   |
+
+**Voltear solo funciona con la app delante** (ya era así; ahora está escrito en
+[ARQUITECTURA](docs/ARQUITECTURA.md#5-inclinación-pausa-de-lado-y-volteo) y
+[SEGUNDO_PLANO](docs/SEGUNDO_PLANO.md#límites-conocidos)): con la ventana flotante, en imagen en
+imagen o en segundo plano el acelerómetro está apagado, por batería y para que no se reinicie
+en el bolsillo.
+
+### Medido (versión web de producción, Chromium sin GPU)
+
+- Del toque al primer fotograma de la hoja, 50 toques por estado: **abre siempre al primer
+  toque** (preparado, en marcha y en pausa), mediana 22–30 ms, máximo 71 ms; con la CPU 4 veces
+  más lenta, mediana 60–84 ms. El menú no cambió nunca el reloj.
+- Abrir el menú con el reloj en marcha y la CPU 4 veces más lenta: 23–25 fps y 0,2–0,5 s de
+  tareas largas en 4 s (con una foto desenfocada preparada aparte, que se probó antes de volver
+  al `BackdropBlur`: 21 fps y 1,2–1,4 s).
+- Aspecto del vidrio: idéntico píxel a píxel a la 1.8.
+- **No se ha podido probar en un móvil** (sin emulador). La razón para volver al
+  `BackdropBlur` es que en el A55 la 1.6 abría fluida con él.
+
+### Cómo actualizar desde la 1.8.1
+
+1. `git pull`. No hace falta `npm install`.
+2. Instala `reloj-de-arena-1.8.2-dev.apk` encima de la 1.8.1 (misma firma: conserva ajustes y
+   permisos), o compílalo igual que la 1.8.1 (`assembleRelease`).
+3. **En el móvil:** toca el menú con el reloj preparado, en marcha y en pausa (con un toque y
+   tumbado): debe salir al momento, con el vidrio desde el primer fotograma, y «Pausa» debe
+   desaparecer mientras el menú está abierto.
+
+### Pruebas
+
+- Core: **189 tests** (5 nuevos de `SheetToggle`); módulo Kotlin: 35 tests.
+- `npm run check` limpio.
+
 ## 1.8.1 — Arreglo de rendimiento (la app iba a tirones en el móvil)
 
 Con la 1.8 la app iba muy lenta en el móvil: la hoja de ajustes aparecía de golpe y sin vidrio,
