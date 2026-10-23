@@ -15,9 +15,19 @@ android {
     versionCode 1
     versionName '1.7.0'
   }
+  testOptions {
+    // Robolectric necesita los recursos de Android para dibujar en la JVM.
+    unitTests.includeAndroidResources = true
+    unitTests.all {
+      // `-Preloj.capturas=/ruta` guarda los PNG del reloj flotante (HourglassViewRenderTest).
+      if (project.hasProperty('reloj.capturas')) systemProperty 'reloj.capturas', project.property('reloj.capturas')
+    }
+  }
 }
 
 dependencies {
   // Tests de TimerModel en la JVM (sin móvil): ./gradlew :background-timer:testDebugUnitTest
   testImplementation 'junit:junit:4.13.2'
+  // Dibujar HourglassView de verdad en la JVM (Canvas nativo) y comprobar los píxeles.
+  testImplementation 'org.robolectric:robolectric:4.14.1'
 }
