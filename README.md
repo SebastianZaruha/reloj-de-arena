@@ -11,30 +11,11 @@ grano, se desliza al inclinar el móvil y empieza de nuevo al darle la vuelta.**
 > Spanish. MIT licensed.
 
 <p align="center">
-  <img src="docs/capturas/13-en-marcha-claro.png" width="28%" alt="Reloj en marcha, tema claro" />
-  <img src="docs/capturas/13-en-marcha-oscuro.png" width="28%" alt="Reloj en marcha, tema oscuro" />
-  <img src="docs/capturas/09-inclinado-claro.png" width="28%" alt="Móvil inclinado: la arena se desliza" />
+  <img src="docs/capturas/13-en-marcha-claro.png" width="24%" alt="Reloj en marcha, tema claro" />
+  <img src="docs/capturas/13-en-marcha-oscuro.png" width="24%" alt="Reloj en marcha, tema oscuro" />
+  <img src="docs/capturas/17-menu-es-oscuro.png" width="24%" alt="Menú de ajustes, tema oscuro" />
+  <img src="docs/capturas/16-gestos-es-claro.png" width="24%" alt="Ayuda de gestos" />
 </p>
-
-<p align="center"><sub>Capturas de la versión web (Chromium, 390×844): en marcha en claro y oscuro, e inclinado 25°.</sub></p>
-
-<p align="center">
-  <img src="docs/capturas/17-menu-es-claro.png" width="22%" alt="Menú de ajustes abierto, tema claro" />
-  <img src="docs/capturas/17-menu-es-oscuro.png" width="22%" alt="Menú de ajustes abierto, tema oscuro, con ciclos" />
-  <img src="docs/capturas/17-ciclo-es-oscuro.png" width="22%" alt="Ciclo en marcha: Descanso 2/4" />
-  <img src="docs/capturas/17-pausa-es-claro.png" width="22%" alt="Pausa con el dedo: «Pausa» centrado" />
-</p>
-
-<p align="center"><sub>Menú de ajustes en claro y oscuro, un ciclo en su descanso y la pausa con el dedo.</sub></p>
-
-<p align="center">
-  <img src="docs/capturas/17-menu-en-claro.png" width="22%" alt="Settings menu in English, light theme" />
-  <img src="docs/capturas/17-ciclo-en-claro.png" width="22%" alt="Cycle running in English: Work 2/4" />
-  <img src="docs/capturas/17-pausa-en-oscuro.png" width="22%" alt="Tap pause in English: «Paused»" />
-  <img src="docs/capturas/16-gestos-es-claro.png" width="22%" alt="Ayuda de gestos" />
-</p>
-
-<p align="center"><sub>Versión 1.6: en inglés (menú, ciclo y pausa) y la ayuda de gestos. Todas las capturas, en claro y oscuro y en los dos idiomas, están en <code>docs/capturas/17-*</code> y <code>16-gestos-*</code>.</sub></p>
 
 ## Índice
 
@@ -44,9 +25,8 @@ grano, se desliza al inclinar el móvil y empieza de nuevo al darle la vuelta.**
 4. [Cómo ejecutarlo](#cómo-ejecutarlo)
 5. [Tests y calidad](#tests-y-calidad)
 6. [Rendimiento y memoria](#rendimiento-y-memoria)
-7. [Hoja de ruta](#hoja-de-ruta)
-8. [Licencia](#licencia)
-9. [Autor](#autor)
+7. [Licencia](#licencia)
+8. [Autor](#autor)
 
 Más documentación: **[docs/ARQUITECTURA.md](docs/ARQUITECTURA.md)** (cómo funciona por dentro y
 dónde está cada cosa en el código) y **[CHANGELOG.md](CHANGELOG.md)** (historial de versiones).
@@ -67,43 +47,9 @@ un fondo cálido y difuso. Todo se maneja con gestos; los ajustes viven en un me
 | **Tumbar de lado** (≈90°)   | Pausa (reloj desenfocado y «Pausa»); de pie, sigue.                     |
 | **Voltear** (180°)          | Como uno real: empieza de cero y cae la arena del otro lado.            |
 
-La pantalla **«Gestos»** los explica: sale sola la primera vez y se abre con el «?» del menú.
-En la esquina del botón del menú los gestos del reloj no hacen nada (tocar ahí solo abre el
-menú).
-
-- **Arena simulada grano a grano** (autómata celular): montón con su ángulo de reposo, el
-  bulbo de arriba que se vacía en embudo (la superficie baja en V, irregular), avalanchas al
-  inclinar, chorro de granos sueltos que acelera, salpica y rueda. Se ve igual a cualquier fps.
-- **La arena nunca se desincroniza del tiempo:** el paso por el cuello lo marca el temporizador,
-  no la física. El tiempo se calcula con marcas de tiempo, exacto aunque la app se suspenda.
-- **Vidrio 2.5D con shaders:** refracción, reflejos con Fresnel, vidrio más grueso en extremos y
-  cuello, granos con varios tonos y destellos de cuarzo que siguen la luz al inclinar.
-- **Sensores:** la luz, los reflejos y la sombra se mueven con la inclinación (paralaje).
-- **Menú de ajustes discreto** (botón de dos rayas arriba a la derecha): una hoja de vidrio
-  esmerilado (desenfoque real con Skia) que sube desde abajo. Se cierra arrastrándola hacia
-  abajo, tocando fuera o con «atrás» (Escape en la web).
-- **Tema claro, oscuro o automático** (sigue al sistema), con un fundido suave al cambiar.
-- **Español e inglés:** Español · English · Automático (sigue al idioma del sistema). Todo
-  está traducido, también lo que lee el lector de pantalla.
-- **Ayuda de gestos:** una pantalla limpia, con un icono de línea por gesto, en los dos
-  idiomas.
-- **Tiempos rápidos:** 5, 10, 15, 25, 45 y 60 min con un toque (deslizar sigue funcionando).
-- **Ciclos trabajo/descanso:** 15/3, 25/5, 50/10 y 90/15 (4 rondas) o **Personalizado**
-  (1–180 min, 1–12 rondas). Al cambiar de fase el reloj **se da la vuelta solo**, suena un
-  aviso suave, vibra y aparece un rótulo discreto («Trabajo 2/4», «Descanso 2/4»). Voltear el
-  móvil reinicia la fase en curso.
-- **Vibración** al empezar, pausar, voltear, en cada escalón al deslizar, al cambiar de fase y
-  al terminar. Sonido y vibración se pueden apagar en el menú.
-- **Aviso sonoro** breve al acabar (solo si la arena se acaba sola).
-- **Entrada animada** al abrir la app (≈1,2 s): el reloj gira una vez y se coloca en su sitio.
-  Solo al arrancar en frío, nunca al volver de segundo plano, y con «reducir movimiento» es un
-  simple fundido.
-- **Recuerda todo:** tema, idioma, tiempos, ciclos, sonido y vibración se guardan en el móvil.
-- **Accesible:** control ajustable para TalkBack, anuncios de estado (también los cambios de
-  fase), etiquetas y roles en todo el menú, zonas táctiles de 44 px o más, contraste
-  comprobado en los dos temas y modo «reducir movimiento». La pantalla no se apaga mientras
-  corre la arena.
-- **Versión web** completa (CanvasKit), con simulador de inclinación por teclado.
+Además, el menú tiene tema claro, oscuro o automático, español e inglés, tiempos rápidos, ciclos
+de trabajo y descanso, y sonido y vibración. La pantalla **«Gestos»** explica todo lo anterior:
+sale sola la primera vez y se abre con el «?» del menú.
 
 ## Tecnología y por qué
 
@@ -274,27 +220,6 @@ Medido en la versión web (Chromium sin GPU, 390×844, ~25 s con el chorro activ
 - Los FPS de la tabla son **sin GPU** (todo por software); en el móvil, con GPU, la animación
   va fluida. La simulación cuesta ~0,2 ms por fotograma; con la arena quieta el bucle se duerme.
 - Detalles y mediciones de cada versión en el [CHANGELOG](CHANGELOG.md).
-
-## Hoja de ruta
-
-- [x] **Fase 1** — Temporizador, simulación de arena, vidrio 2.5D, temas, web (1.0–1.2).
-- [x] **Fase 2** — Inclinación, pausa de lado, volteo y vibración (1.3).
-- [x] **Pulido de realismo** — Tonos y destellos de los granos, imperfecciones del vidrio (1.4).
-- [x] **Fase 3 — Menú discreto y ciclos:** tema claro/oscuro/automático, tiempos rápidos,
-      ciclos trabajo/descanso (adelanta la antigua fase 4), sonido, vibración y entrada
-      animada (1.5).
-- [x] **Pulido 1.6:** inglés con selector de idioma, ayuda de gestos, vaciado en embudo y
-      arena sin rayas tras dar la vuelta (1.6).
-- [ ] Menú: modelo de reloj, contenido y volumen del sonido.
-- [ ] **Fase 5 — Notificaciones** al terminar en segundo plano y persistencia de la cuenta en
-      curso (`serializeTimer`/`parseTimer` ya existen).
-- [ ] **Fase 6 — Agua:** nuevo contenido con su propia simulación de fluido.
-- [ ] **Google Play:** build de producción firmada (AAB), icono y splash propios, ficha y
-      política de privacidad.
-- [ ] **Escritorio (Tauri):** reutiliza `<Hourglass>` y `@reloj/core` sobre la versión web.
-- [ ] **iPhone:** probar en un dispositivo real (el signo del acelerómetro en iOS está sin
-      verificar) y publicar en la App Store.
-- [ ] Inclinar hacia delante/atrás que también mueva la arena (hoy solo mueve la luz).
 
 ## Versiones principales
 
