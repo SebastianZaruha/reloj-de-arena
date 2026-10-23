@@ -15,7 +15,7 @@
 import type { TimerStatus } from './types';
 
 /** Momentos del temporizador que producen una vibración. */
-export type TimerHaptic = 'start' | 'pause' | 'resume' | 'finished' | 'flip';
+export type TimerHaptic = 'start' | 'pause' | 'resume' | 'finished' | 'flip' | 'phase';
 
 /**
  * Vibración que corresponde a pasar de `previous` a `next` (o null).
@@ -25,6 +25,8 @@ export type TimerHaptic = 'start' | 'pause' | 'resume' | 'finished' | 'flip';
  * - paused → running:        'resume'
  * - running → finished:      'finished' (la arena se ha acabado sola)
  * - Reiniciar (→ idle) no vibra: ya lo hace el propio gesto de mantener pulsado.
+ * - 'phase' (cambio trabajo ↔ descanso en los ciclos) tampoco: el estado
+ *   sigue 'running'; lo detecta `sessionCue` (session/session.ts).
  * - 'flip' (voltear el móvil) no sale de aquí: si el reloj ya corría, el
  *   estado sigue siendo 'running' y no hay transición. La pantalla lo pide
  *   aparte con `flipHaptic`.

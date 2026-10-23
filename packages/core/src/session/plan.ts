@@ -1,10 +1,8 @@
 /**
- * Plan de sesión: punto de extensión para los ciclos trabajo/descanso
- * (fase futura, estilo Pomodoro).
- *
- * En la fase 1 solo usamos planes de UN segmento (un temporizador simple),
- * pero la app ya trabaja con este modelo. Cuando lleguen los ciclos bastará
- * con crear planes de varios segmentos y avanzar con `nextSegmentIndex`.
+ * Plan de sesión: la lista de tramos (trabajo / descanso) que hay que
+ * recorrer. Un temporizador simple es un plan de UN tramo
+ * (`singleSegmentPlan`); los ciclos de la fase 3 se construyen con
+ * `planForCycle` (cycles.ts) y los recorre el motor de sesión (session.ts).
  */
 
 export type SegmentKind = 'focus' | 'break';
@@ -26,7 +24,9 @@ export function singleSegmentPlan(durationMs: number): SessionPlan {
 }
 
 /**
- * Plan de ciclos trabajo/descanso (preparado para la fase de ciclos).
+ * Plan genérico de `cycles` pares foco + descanso (incluye el último
+ * descanso). La app usa `planForCycle` (cycles.ts), que omite el descanso
+ * final; esta función se conserva por compatibilidad y para planes repetitivos.
  * Ejemplo: `cyclePlan(25 min, 5 min, 4)` → foco, descanso, foco, descanso...
  */
 export function cyclePlan(focusMs: number, breakMs: number, cycles: number, repeat = false): SessionPlan {

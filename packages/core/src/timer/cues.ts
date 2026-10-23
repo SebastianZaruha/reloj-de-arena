@@ -6,8 +6,8 @@
  * cuándo ocurre un aviso. Así se testea sin audio ni React.
  *
  * Fase 1: solo 'finished' (la arena se ha acabado de forma NATURAL).
- * Fase 3 (ciclos trabajo/descanso): añadir aquí 'phase-change' cuando
- *   termine un segmento del SessionPlan y empiece el siguiente.
+ * Fase 3 (ciclos trabajo/descanso): el aviso 'phase-change' lo detecta
+ *   `sessionCue` (session/session.ts), que mira también el cambio de tramo.
  * Fase 4 (segundo plano): la notificación programada usará el mismo aviso
  *   para no sonar dos veces (si la app está en primer plano suena aquí; si
  *   no, suena la notificación).

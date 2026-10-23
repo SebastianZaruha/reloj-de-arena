@@ -51,6 +51,40 @@ describe('ajustes', () => {
     expect(updateSettings(DEFAULT_SETTINGS, { haptics: false }, 1).haptics).toBe(false);
   });
 
+  it('migra los ajustes de la 1.4 (versión 1) con los valores nuevos por defecto', () => {
+    const old = { version: 1, lastDurationMs: 15 * MIN, theme: 'dark', haptics: false, updatedAt: 5 };
+    const s = sanitizeSettings(old);
+    expect(s).toMatchObject({
+      version: 2,
+      lastDurationMs: 15 * MIN,
+      theme: 'dark',
+      haptics: false,
+      sound: true,
+      sessionMode: 'single',
+      cyclePreset: '25-5',
+    });
+    expect(s.customCycle).toEqual(DEFAULT_SETTINGS.customCycle);
+  });
+
+  it('valida sonido, modo, preajuste y Personalizado (1.5)', () => {
+    const s = sanitizeSettings({
+      sound: false,
+      sessionMode: 'cycles',
+      cyclePreset: 'custom',
+      customCycle: { workMin: 45, breakMin: 10, rounds: 3 },
+    });
+    expect(s).toMatchObject({ sound: false, sessionMode: 'cycles', cyclePreset: 'custom' });
+    expect(s.customCycle).toEqual({ workMin: 45, breakMin: 10, rounds: 3 });
+    const bad = sanitizeSettings({
+      sound: 'no',
+      sessionMode: 'pomodoro',
+      cyclePreset: '30-30',
+      customCycle: 7,
+    });
+    expect(bad).toMatchObject({ sound: true, sessionMode: 'single', cyclePreset: '25-5' });
+    expect(bad.customCycle).toEqual(DEFAULT_SETTINGS.customCycle);
+  });
+
   it('updateSettings aplica cambios y marca la fecha', () => {
     const s = updateSettings(DEFAULT_SETTINGS, { lastDurationMs: 25 * MIN }, 1234);
     expect(s.lastDurationMs).toBe(25 * MIN);

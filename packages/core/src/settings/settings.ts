@@ -7,11 +7,24 @@
  */
 import { DEFAULT_CONTENT_ID, getContent } from '../catalog/contents';
 import { DEFAULT_MODEL_ID, getHourglassModel } from '../catalog/hourglassModels';
+import {
+  CYCLE_PRESET_IDS,
+  DEFAULT_CUSTOM_CYCLE,
+  sanitizeCycleConfig,
+  type CycleConfig,
+  type CyclePresetId,
+  type SessionMode,
+} from '../session/cycles';
 import { DEFAULT_DURATION_MS, snapDuration } from '../timer/duration';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
-export const SETTINGS_VERSION = 1;
+/**
+ * Versión del esquema. 2 (app 1.5): añade sonido, modo de sesión y ciclos.
+ * Los ajustes de la versión 1 se migran solos: lo que falta toma su valor
+ * por defecto en `sanitizeSettings`.
+ */
+export const SETTINGS_VERSION = 2;
 
 export interface Settings {
   /** Versión del esquema, para migraciones futuras. */
@@ -22,13 +35,21 @@ export interface Settings {
   readonly contentId: string;
   /** Modelo de reloj elegido. */
   readonly hourglassModelId: string;
-  /** Tema visual (fase 1: siempre "system"). */
+  /** Tema visual: claro, oscuro o automático (sigue al sistema). */
   readonly theme: ThemePreference;
   /**
-   * Vibración al empezar, pausar, terminar y al deslizar para elegir el
-   * tiempo (desde la 1.3). Aún no hay menú para cambiarlo: queda preparado.
+   * Vibración al empezar, pausar, terminar, cambiar de fase y al deslizar
+   * para elegir el tiempo. Se cambia en el menú (1.5).
    */
   readonly haptics: boolean;
+  /** Sonido al terminar y al cambiar de fase (1.5). */
+  readonly sound: boolean;
+  /** Sesión única (un temporizador) o ciclos trabajo/descanso (1.5). */
+  readonly sessionMode: SessionMode;
+  /** Ciclo elegido: un preajuste o 'custom' (Personalizado). */
+  readonly cyclePreset: CyclePresetId;
+  /** Valores de «Personalizado» (se guardan aunque se elija un preajuste). */
+  readonly customCycle: CycleConfig;
   /**
    * Momento de la última modificación (ms). Servirá para resolver conflictos
    * cuando sincronicemos entre dispositivos ("gana el más reciente").
@@ -43,6 +64,10 @@ export const DEFAULT_SETTINGS: Settings = Object.freeze({
   hourglassModelId: DEFAULT_MODEL_ID,
   theme: 'system',
   haptics: true,
+  sound: true,
+  sessionMode: 'single',
+  cyclePreset: '25-5',
+  customCycle: DEFAULT_CUSTOM_CYCLE,
   updatedAt: 0,
 });
 
@@ -68,6 +93,13 @@ export function sanitizeSettings(raw: unknown): Settings {
     theme,
     // Ajustes guardados por versiones anteriores no traen `haptics`: activada.
     haptics: typeof r.haptics === 'boolean' ? r.haptics : DEFAULT_SETTINGS.haptics,
+    // Novedades de la 1.5: si no vienen (ajustes de la 1.4), valores por defecto.
+    sound: typeof r.sound === 'boolean' ? r.sound : DEFAULT_SETTINGS.sound,
+    sessionMode: r.sessionMode === 'cycles' || r.sessionMode === 'single' ? r.sessionMode : 'single',
+    cyclePreset: CYCLE_PRESET_IDS.includes(r.cyclePreset as CyclePresetId)
+      ? (r.cyclePreset as CyclePresetId)
+      : DEFAULT_SETTINGS.cyclePreset,
+    customCycle: sanitizeCycleConfig(r.customCycle),
     updatedAt: typeof r.updatedAt === 'number' && Number.isFinite(r.updatedAt) ? r.updatedAt : 0,
   };
 }
