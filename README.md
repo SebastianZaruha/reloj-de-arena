@@ -6,7 +6,8 @@ grano, se desliza al inclinar el móvil y empieza de nuevo al darle la vuelta.**
 > **English summary.** _Reloj de Arena_ ("hourglass") is a minimalist timer app for Android
 > (also runs on the web) built with Expo / React Native, React Native Skia shaders and a real
 > granular sand simulation. Tilt the phone and the sand slides; lay it on its side to pause;
-> flip it to restart. TypeScript monorepo with a pure, fully tested core. Documentation is in
+> flip it to restart. A discreet frosted-glass menu adds light/dark/auto themes, quick times and
+> work/break cycles. TypeScript monorepo with a pure, fully tested core. Documentation is in
 > Spanish. MIT licensed.
 
 <p align="center">
@@ -16,6 +17,15 @@ grano, se desliza al inclinar el móvil y empieza de nuevo al darle la vuelta.**
 </p>
 
 <p align="center"><sub>Capturas de la versión web (Chromium, 390×844): en marcha en claro y oscuro, e inclinado 25°.</sub></p>
+
+<p align="center">
+  <img src="docs/capturas/14-menu-claro.png" width="22%" alt="Menú de ajustes abierto, tema claro" />
+  <img src="docs/capturas/14-menu-oscuro.png" width="22%" alt="Menú de ajustes abierto, tema oscuro, con ciclos" />
+  <img src="docs/capturas/14-ciclo-descanso-oscuro.png" width="22%" alt="Ciclo en marcha: Descanso 2/4" />
+  <img src="docs/capturas/14-intro-claro.png" width="22%" alt="Animación de entrada: el reloj gira" />
+</p>
+
+<p align="center"><sub>Versión 1.5: menú de ajustes en claro y oscuro, un ciclo en su descanso y un fotograma de la entrada.</sub></p>
 
 ## Índice
 
@@ -37,7 +47,7 @@ dónde está cada cosa en el código) y **[CHANGELOG.md](CHANGELOG.md)** (histor
 ## Características
 
 La pantalla entera es el reloj: un vidrio fino y transparente con arena que cae de verdad sobre
-un fondo cálido y difuso. Sin menús ni teclados:
+un fondo cálido y difuso. Todo se maneja con gestos; los ajustes viven en un menú discreto:
 
 | Gesto                       | Acción                                                        |
 | --------------------------- | ------------------------------------------------------------- |
@@ -55,11 +65,26 @@ un fondo cálido y difuso. Sin menús ni teclados:
 - **Vidrio 2.5D con shaders:** refracción, reflejos con Fresnel, vidrio más grueso en extremos y
   cuello, granos con varios tonos y destellos de cuarzo que siguen la luz al inclinar.
 - **Sensores:** la luz, los reflejos y la sombra se mueven con la inclinación (paralaje).
-- **Vibración** al empezar, pausar, voltear, en cada escalón al deslizar y al terminar.
+- **Menú de ajustes discreto** (botón de dos rayas arriba a la derecha): una hoja de vidrio
+  esmerilado (desenfoque real con Skia) que sube desde abajo. Se cierra arrastrándola hacia
+  abajo, tocando fuera o con «atrás» (Escape en la web).
+- **Tema claro, oscuro o automático** (sigue al sistema), con un fundido suave al cambiar.
+- **Tiempos rápidos:** 5, 10, 15, 25, 45 y 60 min con un toque (deslizar sigue funcionando).
+- **Ciclos trabajo/descanso:** 25/5, 50/10, 15/3 y 90/15 (4 rondas) o **Personalizado**
+  (1–180 min, 1–12 rondas). Al cambiar de fase el reloj **se da la vuelta solo**, suena un
+  aviso suave, vibra y aparece un rótulo discreto («Trabajo 2/4», «Descanso 2/4»). Voltear el
+  móvil reinicia la fase en curso.
+- **Vibración** al empezar, pausar, voltear, en cada escalón al deslizar, al cambiar de fase y
+  al terminar. Sonido y vibración se pueden apagar en el menú.
 - **Aviso sonoro** breve al acabar (solo si la arena se acaba sola).
-- **Temas claro y oscuro** según el sistema; recuerda la última duración usada.
-- **Accesible:** control ajustable para TalkBack, anuncios de estado y modo «reducir
-  movimiento». La pantalla no se apaga mientras corre la arena.
+- **Entrada animada** al abrir la app (≈1,2 s): el reloj gira una vez y se coloca en su sitio.
+  Solo al arrancar en frío, nunca al volver de segundo plano, y con «reducir movimiento» es un
+  simple fundido.
+- **Recuerda todo:** tema, tiempos, ciclos, sonido y vibración se guardan en el móvil.
+- **Accesible:** control ajustable para TalkBack, anuncios de estado (también los cambios de
+  fase), etiquetas y roles en todo el menú, zonas táctiles de 44 px o más, contraste
+  comprobado en los dos temas y modo «reducir movimiento». La pantalla no se apaga mientras
+  corre la arena.
 - **Versión web** completa (CanvasKit), con simulador de inclinación por teclado.
 
 ## Tecnología y por qué
@@ -93,15 +118,18 @@ reloj-de-arena/
 │           ├── hourglass/    renderizador Skia reutilizable: <Hourglass>, pintores, shaders
 │           ├── motion/       acelerómetro → fuente de movimiento; simulador web
 │           ├── haptics/      vibración
-│           ├── sound/        aviso al terminar
-│           ├── hooks/        useTimer, useSettings…
-│           ├── theme/        paletas clara y oscura
-│           └── components/   tiempo digital, rótulo «Pausa», error boundary
+│           ├── sound/        avisos de fin y de cambio de fase
+│           ├── intro/        animación de entrada (solo al arrancar en frío)
+│           ├── hooks/        useSession, useSettings…
+│           ├── theme/        paletas clara y oscura, tema automático
+│           ├── dev/          reloj acelerado para probar ciclos (solo desarrollo)
+│           └── components/   tiempo y rótulo de fase, «Pausa», menú de ajustes (menu/)
 └── docs/                ARQUITECTURA.md y capturas
 ```
 
 ```
- gestos / sensores ──► useTimer ──► motor puro del core (estado inmutable + marcas de tiempo)
+ gestos / sensores / menú ──► useSession ──► motor de sesiones del core (fases encadenadas
+                                              con marcas de tiempo, estado inmutable)
                                          │ tiempo restante
                                          ▼
  <Hourglass> ──► bucle de animación (≈60 fps, se duerme si nada se mueve)
@@ -187,7 +215,12 @@ URL — se simula el acelerómetro con el teclado (haz clic antes en la página)
 | `0`             | Volver a «de pie»                                    |
 | `Alt` + ratón   | Mover el ratón con Alt pulsado gira el móvil         |
 
-Antes de la primera tecla no se simula nada. Para exportar la web estática:
+Antes de la primera tecla no se simula nada.
+
+**Probar los ciclos sin esperar:** en desarrollo, añade `?velocidad=60` a la URL de la web y el
+tiempo corre 60 veces más rápido (un 25/5 dura 30 s). Solo funciona en modo desarrollo.
+
+Para exportar la web estática:
 `cd apps/mobile && npx expo export --platform web` (sale en `dist/`).
 
 ## Tests y calidad
@@ -198,12 +231,13 @@ npm test             # solo los tests (Vitest, paquete core)
 npm run test:coverage
 ```
 
-El núcleo (`packages/core`) tiene **112 tests** en 14 archivos: temporizador (incluidos casos
+El núcleo (`packages/core`) tiene **140 tests** en 16 archivos: temporizador (incluidos casos
 extremos del final de la cuenta y entradas NaN/Infinity), duraciones, avisos, vibración,
-ajustes, geometría, simulación de arena (avalanchas, volteo, aterrizaje), chorro de granos,
-filtro del acelerómetro y máquina de estados de pausa/volteo. La app se comprueba con tipos,
-ESLint (incluido React Compiler) y pruebas manuales en web y Android (ver
-[CHANGELOG](CHANGELOG.md)).
+ajustes (y su migración), ciclos y motor de sesiones (fases encadenadas sin perder ni un
+milisegundo, pausa, volteo, guardado), geometría, simulación de arena (avalanchas, volteo,
+aterrizaje), chorro de granos, filtro del acelerómetro y máquina de estados de pausa/volteo.
+La app se comprueba con tipos, ESLint (incluido React Compiler), pruebas de extremo a extremo
+en la web con Playwright y pruebas manuales en Android (ver [CHANGELOG](CHANGELOG.md)).
 
 ## Rendimiento y memoria
 
@@ -226,10 +260,10 @@ Medido en la versión web (Chromium sin GPU, 390×844, ~25 s con el chorro activ
 - [x] **Fase 1** — Temporizador, simulación de arena, vidrio 2.5D, temas, web (1.0–1.2).
 - [x] **Fase 2** — Inclinación, pausa de lado, volteo y vibración (1.3).
 - [x] **Pulido de realismo** — Tonos y destellos de los granos, imperfecciones del vidrio (1.4).
-- [ ] **Fase 3 — Menú discreto:** tema, modelo de reloj, contenido, sonido (activar, volumen) y
-      vibración.
-- [ ] **Fase 4 — Ciclos trabajo/descanso** (`SessionPlan` ya existe en el core) con aviso al
-      cambiar de fase.
+- [x] **Fase 3 — Menú discreto y ciclos:** tema claro/oscuro/automático, tiempos rápidos,
+      ciclos trabajo/descanso (adelanta la antigua fase 4), sonido, vibración y entrada
+      animada (1.5).
+- [ ] Menú: modelo de reloj, contenido y volumen del sonido.
 - [ ] **Fase 5 — Notificaciones** al terminar en segundo plano y persistencia de la cuenta en
       curso (`serializeTimer`/`parseTimer` ya existen).
 - [ ] **Fase 6 — Agua:** nuevo contenido con su propia simulación de fluido.
@@ -261,7 +295,8 @@ Medido en la versión web (Chromium sin GPU, 390×844, ~25 s con el chorro activ
 | Node.js usado para desarrollar            | 22.23.4                          |
 | APK: JDK / Gradle / NDK                   | 17 / 9.4.1 / 27.1 (solo arm64)   |
 
-Tipografía: **Manrope** (ExtraLight para el tiempo), vía `@expo-google-fonts/manrope`.
+Tipografía: **Manrope** (ExtraLight para el tiempo; Light, Regular, Medium y SemiBold en el
+menú y los rótulos), vía `@expo-google-fonts/manrope`.
 
 Los avisos de licencia de las dependencias están en
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

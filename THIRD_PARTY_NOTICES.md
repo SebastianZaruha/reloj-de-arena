@@ -25,7 +25,7 @@ repositorio: se descargan con `npm install`.
 | react-native-safe-area-context                        | 5.10.1  | MIT          | Th3rd Wave                                                |
 | @react-native-async-storage/async-storage             | 2.2.0   | MIT          | Facebook, Inc. (React Native Community)                   |
 | @expo-google-fonts/manrope (paquete)                  | 0.4.2   | MIT          | Expo                                                      |
-| **Fuente Manrope** (ExtraLight y Regular)             | —       | SIL OFL 1.1  | The Manrope Project Authors (github.com/sharanda/manrope) |
+| **Fuente Manrope** (ExtraLight a SemiBold)            | —       | SIL OFL 1.1  | The Manrope Project Authors (github.com/sharanda/manrope) |
 
 La fuente Manrope se distribuye bajo la [SIL Open Font License 1.1](https://openfontlicense.org):
 se puede usar, incluir y redistribuir con la app libremente; no se puede vender la fuente por
@@ -47,8 +47,9 @@ licencia; para una versión publicada (Google Play) conviene mostrarlos en una p
 
 ## Recursos
 
-| Recurso                                            | Origen                                                                  |
-| -------------------------------------------------- | ----------------------------------------------------------------------- |
-| `apps/mobile/assets/sounds/fin.mp3` (aviso de fin) | "New Notification 07", de [Pixabay](https://pixabay.com/es/sound-effects/pel%C3%ADculas-y-efectos-especiales-new-notification-07-210334/). [Pixabay Content License](https://pixabay.com/es/service/license-summary/): uso gratuito, también comercial; no se permite redistribuirlo como archivo suelto. |
-| Iconos y splash (`apps/mobile/assets/*.png`)       | Plantilla de `create-expo-app` (MIT, Expo). Se sustituirán por propios. |
-| Capturas (`docs/capturas/`)                        | Generadas a partir de la propia app.                                    |
+| Recurso                                                 | Origen                                                                                                                                                                                                                                                                                                    |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/mobile/assets/sounds/fin.mp3` (aviso de fin)      | "New Notification 07", de [Pixabay](https://pixabay.com/es/sound-effects/pel%C3%ADculas-y-efectos-especiales-new-notification-07-210334/). [Pixabay Content License](https://pixabay.com/es/service/license-summary/): uso gratuito, también comercial; no se permite redistribuirlo como archivo suelto. |
+| `apps/mobile/assets/sounds/cambio.mp3` (cambio de fase) | Original del proyecto: dos notas de campanilla sintetizadas (sol⁵ → re⁶). Misma licencia que el código (MIT).                                                                                                                                                                                             |
+| Iconos y splash (`apps/mobile/assets/*.png`)            | Plantilla de `create-expo-app` (MIT, Expo). Se sustituirán por propios.                                                                                                                                                                                                                                   |
+| Capturas (`docs/capturas/`)                             | Generadas a partir de la propia app.                                                                                                                                                                                                                                                                      |

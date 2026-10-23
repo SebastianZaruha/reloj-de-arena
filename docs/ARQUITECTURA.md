@@ -1,8 +1,8 @@
 # Arquitectura y funcionamiento interno
 
 Este documento explica **cómo está hecho** el Reloj de Arena: dónde vive cada cosa en el
-código y cómo funcionan el temporizador, la arena, el vidrio, la inclinación, la vibración y el
-sonido. Para instalarlo y ejecutarlo, ver el [README](../README.md); para la historia de cada
+código y cómo funcionan el temporizador, las sesiones y los ciclos, la arena, el vidrio, la
+inclinación, la vibración, el sonido, el menú de ajustes, los temas y la entrada animada. Para instalarlo y ejecutarlo, ver el [README](../README.md); para la historia de cada
 versión, el [CHANGELOG](../CHANGELOG.md).
 
 ## Índice
@@ -17,12 +17,16 @@ versión, el [CHANGELOG](../CHANGELOG.md).
 8. [Vibración](#6-vibración)
 9. [Sonido](#7-sonido)
 10. [Memoria y objetos Skia](#8-memoria-y-objetos-skia)
-11. [Simulador de inclinación en el navegador](#simulador-de-inclinación-en-el-navegador)
-12. [Personalizar colores (fondo claro)](#personalizar-colores-fondo-claro)
-13. [Decisiones clave y por qué](#decisiones-clave-y-por-qué)
-14. [Accesibilidad](#accesibilidad)
-15. [Limitaciones conocidas](#limitaciones-conocidas)
-16. [Scripts](#scripts)
+11. [Sesiones y ciclos trabajo/descanso (1.5)](#9-sesiones-y-ciclos-trabajodescanso)
+12. [Menú de ajustes (1.5)](#10-menú-de-ajustes)
+13. [Temas claro, oscuro y automático (1.5)](#11-temas-claro-oscuro-y-automático)
+14. [Entrada animada (1.5)](#12-entrada-animada)
+15. [Simulador de inclinación en el navegador](#simulador-de-inclinación-en-el-navegador)
+16. [Personalizar colores (fondo claro)](#personalizar-colores-fondo-claro)
+17. [Decisiones clave y por qué](#decisiones-clave-y-por-qué)
+18. [Accesibilidad](#accesibilidad)
+19. [Limitaciones conocidas](#limitaciones-conocidas)
+20. [Scripts](#scripts)
 
 ## Estructura del monorepo
 
@@ -46,38 +50,49 @@ reloj-de-arena/
 │       ├── src/
 │       │   ├── timer/      ← motor del temporizador, duraciones, formato, avisos, vibración y serialización
 │       │   ├── recovery/   ← política del error boundary (remontar / recargar / rendirse)
-│       │   ├── session/    ← planes de sesión (preparado para ciclos trabajo/descanso)
-│       │   ├── settings/   ← modelo de ajustes + validación (sanitize)
+│       │   ├── session/    ← planes, ciclos (preajustes, límites) y MOTOR DE SESIONES
+│       │   ├── settings/   ← modelo de ajustes + validación (sanitize) + plan según ajustes
 │       │   ├── catalog/    ← catálogos: contenidos (arena; agua más adelante) y modelos de reloj
 │       │   ├── geometry/   ← perfil matemático (silueta) del reloj
 │       │   ├── physics/    ← vectores 2D, filtro del acelerómetro, pausa/volteo
 │       │   ├── sim/        ← simulación granular de la arena + controlador de flujo
 │       │   └── persistence/← interfaces de almacenamiento + implementación local
-│       └── test/           ← tests de Vitest (112 tests)
+│       └── test/           ← tests de Vitest (140 tests)
 │
 └── apps/
     └── mobile/             ← @reloj/mobile: la app Expo / React Native
         ├── index.ts        ← entrada de Expo → src/bootstrap(.web).ts
         ├── app.json        ← configuración de Expo (nombre, paquete Android, tema, web…)
-        ├── assets/sounds/  ← fin.mp3 (aviso al terminar)
+        ├── assets/sounds/  ← fin.mp3 (aviso al terminar) y cambio.mp3 (cambio de fase)
         ├── public/         ← canvaskit.wasm para la web (lo copia npm install; no se versiona)
         └── src/
-            ├── App.tsx             ← proveedores (gestos, safe area), fuentes y ajustes
+            ├── App.tsx             ← proveedores (gestos, safe area), fuentes, ajustes y fondo según el tema
             ├── bootstrap.ts        ← arranque nativo
             ├── bootstrap.web.ts    ← arranque web: carga CanvasKit y después la app
-            ├── screens/TimerScreen.tsx ← la pantalla: gestos, accesibilidad, diseño
-            ├── components/TimeDisplay.tsx ← el tiempo digital de abajo
+            ├── screens/TimerScreen.tsx ← la pantalla: gestos, avisos, menú, entrada, accesibilidad
+            ├── components/TimeDisplay.tsx ← el tiempo digital de abajo y el rótulo de fase
             ├── components/HourglassBoundary.tsx ← error boundary: recupera el reloj si Skia falla
-            ├── hooks/              ← useTimer, useSettings, useLatest, useKeepAwakeWhile
-            ├── sound/useCueSound.ts← sonido de aviso al terminar (expo-audio)
+            ├── components/menu/    ← MENÚ DE AJUSTES (ver sección 10)
+            │   ├── MenuButton.tsx  ← botón de dos rayas (arriba a la derecha)
+            │   ├── SettingsSheet.tsx ← la hoja: secciones, arrastre, «atrás»
+            │   ├── FrostedPanel.tsx  ← el vidrio esmerilado (Skia, dentro del lienzo del reloj)
+            │   ├── useSheet.ts     ← estado y animación de abrir/cerrar
+            │   ├── controls.tsx    ← segmentado, chip, interruptor y stepper accesibles
+            │   └── themedStyles.ts ← colores que cambian suavemente con el tema
+            ├── hooks/              ← useSession, useSettings, useLatest, useKeepAwakeWhile
+            ├── intro/useIntro.ts   ← entrada animada (solo al arrancar en frío)
+            ├── dev/devClock.ts     ← reloj de la app; acelerable con ?velocidad=N (solo desarrollo)
+            ├── sound/useCueSound.ts← avisos de fin y de cambio de fase (expo-audio)
             ├── haptics/            ← vibración (expo-haptics): haptics.ts + useTimerHaptics
             ├── motion/             ← acelerómetro (expo-sensors) → LiveMotion; simulador web
             ├── components/PauseLabel.tsx ← rótulo «Pausa» al tumbar el móvil
             ├── recovery/           ← guardar/recuperar la cuenta si hay que recargar (web)
             ├── storage/            ← adaptador AsyncStorage → interfaz del core
-            ├── theme/theme.ts      ← paletas clara y oscura
+            ├── theme/theme.ts      ← paletas clara y oscura (también las del menú) y resolveScheme
+            ├── theme/useAppTheme.ts← tema elegido o del sistema + progreso animado 0..1
             └── hourglass/          ← RENDERIZADOR REUTILIZABLE (Skia)
-                ├── Hourglass.tsx   ← componente <Hourglass/> (3 capas en un Canvas)
+                ├── Hourglass.tsx   ← componente <Hourglass/> (capas en un Canvas, pose animable, hijos)
+                ├── useThemeCrossfade.ts ← fundido al cambiar de tema (foto del lienzo)
                 ├── layout.ts       ← tamaños en píxeles y trazados del vidrio
                 ├── staticLayers.ts ← GlassPainter: fondo, sombra y vidrio (SkPicture)
                 ├── pictureSlot.ts  ← publica pictures y libera los viejos (anillo fijo)
@@ -96,7 +111,7 @@ puede testear sin emuladores y reutilizar en la futura app de escritorio.
 
 ```
  ┌───────────── TimerScreen ─────────────┐
- │ gestos (pan/tap/long press) ──► useTimer ──► motor puro del core (estado inmutable)
+ │ gestos (pan/tap/long press) y menú ──► useSession ──► motor de sesiones del core (fases encadenadas)
  │                                   │
  │                         getSnapshot() (tiempo calculado con marcas de tiempo)
  │                                   ▼
@@ -222,10 +237,11 @@ Detalles útiles:
 | Pausar (con el dedo o de lado) | `impactAsync(Heavy)` (más fuerte, para distinguirla)                |
 | Voltear                        | `impactAsync(Medium)` (una sola vez)                                |
 | Cada escalón al deslizar       | Android: `performAndroidHapticsAsync(Clock_Tick)`; iOS: `selection` |
-| Fin del tiempo                 | `notificationAsync(Success)`, junto al sonido                       |
+| Cambio de fase (ciclos)        | Dos `impactAsync(Medium)` separados 120 ms, junto al sonido         |
+| Fin del tiempo / de los ciclos | `notificationAsync(Success)`, junto al sonido                       |
 
 Los clics al deslizar son uno por escalón que cambia y nunca dos a menos de 30 ms
-(`StepTicker`). Hay un ajuste `haptics` (por defecto activado; aún sin menú para cambiarlo).
+(`StepTicker`). El ajuste `haptics` (interruptor «Vibración» del menú) lo apaga todo.
 
 El módulo está en `apps/mobile/src/haptics/` (`haptics.ts` + `useTimerHaptics.ts`); la decisión
 de qué vibración toca en cada cambio de estado es lógica pura del core (`timer/haptics.ts`,
@@ -234,14 +250,18 @@ con tests). En la web no hace nada.
 ### 7. Sonido
 
 - **Sonido al terminar** (`expo-audio`): se precarga una vez, se libera al desmontar y suena
-  una vez solo si la cuenta llega a 0 sola. En web, los navegadores solo permiten audio
+  una vez solo si la cuenta llega a 0 sola (en ciclos, al acabar la última ronda).
+- **Sonido de cambio de fase** (`cambio.mp3`, propio): dos notas suaves de campanilla, más
+  bajas de volumen que el aviso de fin, al pasar de trabajo a descanso o al revés.
+- El interruptor **«Sonido»** del menú (ajuste `sound`) los silencia los dos. En web, los navegadores solo permiten audio
   después de una interacción del usuario; como para empezar hay que tocar el reloj, funciona.
   Si un navegador lo bloqueara, la app sigue igual (el fallo se ignora).
 
-El aviso está en `apps/mobile/assets/sounds/fin.mp3` y lo gestiona `sound/useCueSound.ts`
-(volumen y activación en la constante `SOUND_PREFERENCES`). Qué aviso toca y cuándo lo decide
-`CueDetector` en `core/src/timer/cues.ts`: solo `'finished'` cuando la cuenta llega a 0 sola
-(no al pausar o reiniciar a mano).
+Los avisos están en `apps/mobile/assets/sounds/` y los gestiona `sound/useCueSound.ts`
+(volúmenes en `CUE_VOLUME`). Qué aviso toca y cuándo lo decide `sessionCue()` en
+`core/src/session/session.ts` (con tests): `'phase-change'` si el contador `transitions` sube
+sin que la sesión haya terminado, y `'finished'` cuando termina sola (no al pausar o reiniciar a
+mano).
 
 ### 8. Memoria y objetos Skia
 
@@ -259,6 +279,107 @@ El aviso está en `apps/mobile/assets/sounds/fin.mp3` y lo gestiona `sound/useCu
   dibuja como 4 microgranos ≈ 24.000 granos visibles). Toda la simulación ocupa < 200 KB.
   Con granos más grandes (2,6 dp) se ahorrarían ~1.600 granos pero la arena se ve gruesa; no
   compensa.
+
+### 9. Sesiones y ciclos trabajo/descanso
+
+Desde la 1.5 la pantalla no maneja un temporizador suelto sino una **sesión**: un plan con una
+o varias fases (`segments`) que se encadenan. Una sesión única es un plan de una fase; un
+ciclo 25/5 × 4 rondas es `Trabajo, Descanso, Trabajo, Descanso, Trabajo, Descanso, Trabajo`
+(**sin descanso final**: al acabar la última ronda de trabajo, se acabó; constante
+`FINAL_BREAK`).
+
+- **Todo en el core, todo puro y con tests** (`session/cycles.ts`, `session/session.ts`):
+  `createSession`, `tickSession`, `toggleSession`, `flipSession`, `restartSession`,
+  `replacePlan`, `sessionSnapshot`, `serializeSession`/`parseSession`…
+- **Sin perder milisegundos:** la sesión guarda el temporizador de la fase actual (con sus
+  marcas de tiempo). `settle()` mira si esa fase ya ha terminado y, si es así, arranca la
+  siguiente **en el instante exacto en que acabó la anterior** (no «ahora»). Si el móvil estuvo
+  dormido media hora, al volver se encadenan de golpe todas las fases que tocaba.
+- **`transitions`** es un contador que sube en cada cambio de fase y nunca baja. Así la app
+  detecta el cambio comparando dos números (para el sonido, la vibración y el giro del reloj),
+  aunque entre dos fotogramas haya habido varios cambios.
+- **Voltear el móvil** reinicia la fase en curso (en marcha). Si la sesión había terminado,
+  empieza de nuevo desde la primera fase.
+- **Preajustes** 25/5, 50/10, 15/3 y 90/15 (4 rondas, `CYCLE_PRESETS`) y **Personalizado**
+  (1–180 min por fase siguiendo los mismos escalones que al deslizar, 1–12 rondas;
+  `CYCLE_LIMITS`, `stepMinutes`, `stepRounds`).
+- **Ajustes → plan:** `sessionPlanFor(settings)` (en `settings/sessionPlan.ts`) decide el plan.
+  La pantalla lo recalcula cuando cambian los ajustes y, si es distinto (`samePlan`), lo aplica
+  con `replacePlan` (la sesión vuelve a «lista para empezar»).
+
+**El giro al cambiar de fase.** Lo dibuja el bucle de la arena (`useSandEngine`): en el mismo
+fotograma en que ve subir `transitions`, empieza a girar el reloj 180° (`spin`, 950 ms,
+`TURN_MS`, aceleración y frenada suaves). Mientras gira, la arena va «pegada» al vidrio (no se
+sincroniza). Al terminar, se gira la rejilla (`rotateHalfTurn()`, lo mismo que al voltear el
+móvil), se pone `spin` a 0 en el mismo fotograma (no se nota el cambio) y la arena vuelve a caer
+desde arriba. Como el reloj es alto y estrecho, a mitad de giro no cabría a lo ancho: se
+**encoge lo justo según el ángulo** (`fit` en `Hourglass.tsx`) y la sombra se desvanece.
+
+**Rótulo de fase:** encima del tiempo, pequeño y discreto («Trabajo 2/4», «Descanso 2/4»).
+En sesión única no aparece. Al acabar los ciclos: «ciclos completados · toca para empezar».
+
+**Para probarlo sin esperar** (solo en desarrollo, en la web): `?velocidad=60` en la URL hace
+que el reloj de la app (`dev/devClock.ts`) corra 60 veces más rápido. En producción la
+constante se ignora.
+
+### 10. Menú de ajustes
+
+```
+ MenuButton (dos rayas, 48×48) ──► useSheet.show() ──► offset: alto → 0 (340 ms)
+                                        │
+          ┌─────────────────────────────┴──────────────────────────┐
+          ▼                                                        ▼
+ FrostedPanel (Skia, DENTRO del lienzo del reloj)       SettingsSheet (React Native, encima)
+ velo + sombra + BackdropBlur + tinte + filo de luz      secciones, controles, arrastre
+          └──────────── los dos leen el mismo shared value `offset` ────────────┘
+```
+
+- **Vidrio esmerilado sin dependencias nuevas:** el desenfoque es un `BackdropBlur` de Skia
+  (radio 26) recortado a la forma de la hoja. Tiene que estar **dentro del mismo `<Canvas>`**
+  que el reloj para poder desenfocar lo que hay debajo; por eso `<Hourglass>` acepta `children`.
+  Encima, transparente, va el contenido en React Native. Como los dos se mueven con el mismo
+  shared value (`offset`), van pegados al píxel, también al arrastrar.
+- **Abrir / cerrar:** botón; tocar fuera (un velo `Pressable` transparente); arrastrar hacia
+  abajo desde cualquier sitio (cierra si se arrastra más del 22 % del alto o rápido, si no
+  vuelve a su sitio); el botón «atrás» de Android (`BackHandler`) o Escape en la web.
+- **No choca con deslizar sobre el reloj:** con la hoja abierta, los gestos del reloj se
+  desactivan y el velo y la hoja lo tapan; con la hoja cerrada, la hoja no recibe toques.
+- **Alto:** el del contenido; si no cabe (pantallas bajas) se queda en casi toda la pantalla
+  y el contenido se desplaza (`ScrollView`).
+- **Secciones:** Tema (segmentado), Tiempos rápidos (chips redondos de 5 a 60 min), Sesión
+  (Sesión única / Ciclos, preajustes, Personalizado con steppers y un resumen) y Sonido /
+  Vibración (interruptores). La sección que no está activa se atenúa pero sigue funcionando:
+  tocar un tiempo rápido pasa a sesión única; tocar un preajuste o un stepper pasa a ciclos.
+  Tocar un stepper con un preajuste elegido pasa a Personalizado copiando sus valores.
+- **Todo se guarda** al momento en los ajustes (`SettingsStore` sobre AsyncStorage; versión 2
+  de los ajustes, con migración automática desde la 1).
+
+### 11. Temas claro, oscuro y automático
+
+- `useAppTheme()` decide el tema: el elegido en el menú o, en «Automático», el del sistema
+  (`useColorScheme`, cambia en vivo). Ya no hay ningún tema forzado en el código.
+- **Transición suave:** justo antes de cambiar, `useThemeCrossfade` hace una **foto del lienzo**
+  (`makeImageSnapshot`), la pone encima y la desvanece en 520 ms mientras debajo ya se dibuja el
+  tema nuevo. Después la libera (es un objeto Skia). Los textos y controles de React Native
+  mezclan colores con `interpolateColor` y un progreso 0..1 animado.
+- **Contraste:** los colores del menú (`UiPalette` en `theme.ts`) están elegidos para que los
+  textos pasen 4,5:1 y los iconos y bordes 3:1 en los dos temas; la tabla está comentada en el
+  propio archivo. El tiempo grande y el rótulo de fase son decorativos (muy suaves a
+  propósito) y el lector de pantalla los lee del control del reloj.
+
+### 12. Entrada animada
+
+Al abrir la app **en frío** (≈1,25 s): el reloj aparece algo más grande (×1,12) y centrado,
+da una vuelta completa de 360° con aceleración y frenada suaves (900 ms) y luego se coloca en
+su sitio y tamaño (350 ms) mientras aparece su sombra; el tiempo y el botón del menú aparecen
+con un fundido al final.
+
+- **Solo en frío:** una variable de módulo (`introPlayed` en `intro/useIntro.ts`) recuerda que
+  ya se ha mostrado. Volver de segundo plano no recrea el módulo, así que no se repite.
+- **Reducir movimiento:** solo un fundido de 250 ms, sin giro ni escala.
+- **Coste:** todo son shared values animados en el hilo de UI; React no se re-renderiza durante
+  la animación. Los grupos de Skia necesitan una capa (`saveLayer`) para desvanecer un
+  `<Picture>`; esas capas **solo existen mientras dura la animación** (o el giro de fase).
 
 ## Simulador de inclinación en el navegador
 
@@ -330,6 +451,10 @@ Los demás colores (texto del tiempo, rótulo «Pausa», vidrio, sombra, arena) 
 | **Persistencia tras interfaces** (`KeyValueStorage`, `SettingsStore`) | Hoy AsyncStorage; mañana sincronización entre dispositivos sin tocar la UI. Los ajustes llevan `updatedAt` para resolver conflictos.                                                 |
 | **Development build** (`expo-dev-client`) + compatible con Expo Go    | No dependemos de la versión de Expo Go de la Play Store, y no usamos módulos nativos propios, así que Expo Go 58 sigue sirviendo.                                                    |
 | **Objetos Skia con dueño y liberación diferida**                      | En web CanvasKit vive en memoria WASM que el recolector no ve: todo objeto Skia se libera, pero solo cuando el lienzo ya no lo usa.                                                  |
+| **Sesión = plan de fases** en el core (1.5)                           | Ciclos y sesión única son lo mismo con distinto plan: una sola lógica, pura y con tests. Las fases se encadenan por marcas de tiempo, sin deriva.                                    |
+| **Vidrio del menú con Skia** (`BackdropBlur`) (1.5)                   | Desenfoque real sin añadir un módulo nativo (no hace falta APK nuevo) y funciona igual en la web.                                                                                    |
+| **Sin descanso tras la última ronda** (1.5)                           | Al acabar el último trabajo, la sesión ha terminado: un descanso final solo retrasaría el aviso de fin. Se puede cambiar con `FINAL_BREAK`.                                          |
+| **Cambiar el plan reinicia la sesión** (1.5)                          | Si cambias de ciclo a mitad, la sesión vuelve a «lista para empezar» con el plan nuevo: es lo más predecible.                                                                        |
 
 ## Accesibilidad
 
@@ -338,7 +463,13 @@ Los demás colores (texto del tiempo, rótulo «Pausa», vidrio, sombra, arena) 
 - Deslizar arriba/abajo con TalkBack sube/baja la duración; doble toque empieza/pausa; acción
   personalizada «Reiniciar». Se anuncia «Tiempo terminado» al acabar.
 - **Reducir movimiento:** si el sistema lo pide, el chorro se dibuja estático (sin granos
-  animados); la arena sigue reflejando el tiempo restante.
+  animados); la arena sigue reflejando el tiempo restante. La entrada es un simple fundido y la
+  hoja del menú aparece sin deslizarse.
+- **Menú:** botón «Ajustes» (con estado abierto/cerrado), opciones con rol de radio y
+  seleccionadas, interruptores con rol de switch, steppers ajustables (deslizar arriba/abajo con
+  TalkBack) que leen «25 minutos», «4 rondas». Zonas táctiles de 44 px o más. Al abrir se
+  anuncia «Ajustes» y el resto de la pantalla queda oculto al lector.
+- **Ciclos:** se anuncia cada cambio de fase («Descanso, ronda 2 de 4») y el final.
 - La pantalla se mantiene encendida mientras corre la arena.
 
 ## Limitaciones conocidas
@@ -347,6 +478,10 @@ Los demás colores (texto del tiempo, rótulo «Pausa», vidrio, sombra, arena) 
   se recuerda la última duración. En web sí se conserva si la página tiene que recargarse por
   un fallo gráfico.
 - Inclinar hacia delante/atrás solo mueve la luz, no la arena.
+- Los ciclos solo avanzan con la app abierta o en segundo plano reciente: no hay
+  notificaciones todavía (fase de notificaciones). Al volver, se ponen al día al instante.
+- En la web el desenfoque del menú lo hace CanvasKit por software si no hay GPU; en el móvil va
+  por GPU.
 - iOS: el signo del acelerómetro y la vibración no se han probado en un iPhone real.
 - Icono y pantalla de carga son todavía los de la plantilla de Expo.
 - `npm audit` avisa de vulnerabilidades en dependencias **de desarrollo** de las herramientas de

@@ -9,6 +9,95 @@ funcionamiento interno en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md).
 > APK de desarrollo. A partir de la publicación en GitHub basta con `git pull`; las
 > instrucciones «Cómo actualizar» se conservan como referencia.
 
+## 1.5.0 — Menú de ajustes, temas y ciclos trabajo/descanso (fase 3)
+
+La **fase 3**: un menú discreto con vidrio esmerilado, tema claro/oscuro/automático, tiempos
+rápidos, **ciclos trabajo/descanso** (adelanta la antigua fase 4), sonido y vibración
+configurables y una entrada animada. **No hay cambios nativos:** sigue valiendo el APK de
+desarrollo de la 1.3.
+
+<p align="center">
+  <img src="docs/capturas/14-menu-claro.png" width="22%" alt="Menú abierto, tema claro" />
+  <img src="docs/capturas/14-menu-oscuro.png" width="22%" alt="Menú abierto, tema oscuro" />
+  <img src="docs/capturas/14-ciclo-trabajo-claro.png" width="22%" alt="Ciclo: Trabajo 2/4" />
+  <img src="docs/capturas/14-intro-claro.png" width="22%" alt="Entrada animada" />
+</p>
+
+### Cómo actualizar desde la 1.4
+
+1. `git pull`.
+2. **No hace falta `npm install`** (no cambia ninguna dependencia; las fuentes nuevas de Manrope
+   ya venían en `@expo-google-fonts/manrope`).
+3. **No hace falta APK nuevo**: el desenfoque es de Skia y la persistencia de AsyncStorage, que
+   ya estaban en el APK de la 1.3.
+4. `npm run mobile` y abre la app. Tus ajustes de la 1.4 se migran solos (tema, vibración y
+   última duración se conservan).
+
+### Novedades
+
+| Qué                       | Cómo                                                                                                                                                                                                     | Dónde                                                    |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Botón de menú             | Dos rayas finas sin borde, arriba a la derecha (48×48 de zona táctil). Aparece con la entrada y se atenúa con el menú abierto.                                                                           | `components/menu/MenuButton.tsx`                         |
+| Hoja de ajustes           | Sube desde abajo (Reanimated). Vidrio esmerilado real: `BackdropBlur` de Skia en el lienzo del reloj, con tinte, sombra y filo de luz. Se cierra arrastrando, tocando fuera, con «atrás» o Escape (web). | `components/menu/`                                       |
+| Tema                      | Claro (`#EBE5DD`), Oscuro o Automático (sigue al sistema en vivo), con fundido de 520 ms. Se quitan los temas forzados de `TimerScreen.tsx` y `App.tsx`.                                                 | `theme/useAppTheme.ts`, `hourglass/useThemeCrossfade.ts` |
+| Tiempos rápidos           | 5, 10, 15, 25, 45, 60 min. Deslizar sobre el reloj sigue funcionando igual.                                                                                                                              | `SettingsSheet.tsx`                                      |
+| Ciclos                    | 25/5, 50/10, 15/3, 90/15 (4 rondas) y Personalizado (1–180 min, 1–12 rondas). Lógica pura en el core con tests, por marcas de tiempo.                                                                    | `core/src/session/`                                      |
+| Cambio de fase            | El reloj se da la vuelta solo (950 ms), la arena vuelve a caer, suena `cambio.mp3`, vibra dos veces y el rótulo pasa a «Descanso 2/4». Al acabar: aviso de fin y vibración de éxito.                     | `useSandEngine.ts`, `TimerScreen.tsx`                    |
+| Voltear el móvil (ciclos) | Reinicia la fase en curso.                                                                                                                                                                               | `core/src/session/session.ts` (`flipSession`)            |
+| Sonido y vibración        | Interruptores en el menú (el ajuste `haptics` ya existía; `sound` es nuevo).                                                                                                                             | `sound/useCueSound.ts`, `haptics/`                       |
+| Entrada animada           | Solo al arrancar en frío (~1,25 s): el reloj, algo más grande, gira 360° y se coloca; el tiempo y el menú aparecen después. Con «reducir movimiento», solo un fundido.                                   | `intro/useIntro.ts`, `Hourglass.tsx` (`pose`)            |
+| Ajustes guardados         | Versión 2 de los ajustes: `sound`, `sessionMode`, `cyclePreset`, `customCycle`. Migración automática desde la 1.                                                                                         | `core/src/settings/settings.ts`                          |
+| Accesibilidad             | Roles y etiquetas en todo el menú, zonas táctiles ≥ 44 px, contraste comprobado en los dos temas, anuncios de fase.                                                                                      | `components/menu/controls.tsx`, `theme/theme.ts`         |
+| Reloj acelerado (dev)     | `?velocidad=60` en la URL de la web (solo desarrollo) para probar ciclos en segundos.                                                                                                                    | `dev/devClock.ts`                                        |
+
+### Decisiones tomadas (se pueden cambiar)
+
+- **Sin descanso después de la última ronda** (25/5 × 4 = T D T D T D T). Constante
+  `FINAL_BREAK` en `core/src/session/cycles.ts`.
+- **Cambiar el plan desde el menú reinicia la sesión** (vuelve a «lista para empezar»), también
+  si estaba en marcha.
+- Tocar un tiempo rápido pasa a **Sesión única**; tocar un preajuste o un stepper pasa a
+  **Ciclos**. Tocar un stepper con un preajuste elegido pasa a **Personalizado** copiando sus
+  valores. En ciclos, deslizar sobre el reloj cambia los minutos de **trabajo** (y pasa a
+  Personalizado).
+- Los steppers de minutos usan los mismos escalones que deslizar (1–10 de 1 en 1, 15–60 de 5
+  en 5, 75–180 de 15 en 15).
+- El botón del menú es un poco más oscuro que el tiempo para llegar a 3:1 de contraste; el
+  tiempo y el rótulo de fase siguen siendo muy suaves a propósito.
+- Voltear el móvil con el menú abierto cierra el menú.
+
+### Pruebas
+
+- **Core:** 140 tests en 16 archivos (nuevos: `cycles.test.ts`, `session.test.ts`; ampliado
+  `settings.test.ts` con la migración). `npm run check` pasa entero.
+- **Web, de extremo a extremo con Playwright** (Chromium sin GPU, 390×844): abrir el menú con
+  el botón; cerrarlo tocando fuera, arrastrando hacia abajo, con el asa y con Escape; un
+  arrastre corto no lo cierra; cada control (tema, chip de 25 min, preajuste 50/10,
+  Personalizado, los tres steppers, sonido, vibración); persistencia tras recargar; deslizar y
+  tocar el reloj después de usar el menú; un ciclo 1/1 × 2 a velocidad ×20 pasando por
+  Trabajo 1/2 → Descanso 1/2 → Trabajo 2/2 → fin; la entrada (fotogramas), también con
+  «reducir movimiento»; los dos temas; sin errores en la consola.
+- **Errores encontrados y corregidos al probar:** la hoja no terminaba de cerrarse (un efecto
+  cortaba la animación de salida y el velo se quedaba invisible encima, robando el primer
+  gesto); el segmento del tema dejaba pegado su fondo en la web; «Personalizado» se cortaba; en
+  el giro de la entrada el reloj no cabía a lo ancho; la opacidad de un `<Picture>` necesita una
+  capa en Skia.
+
+### Memoria y rendimiento (web, Chromium sin GPU)
+
+| Momento                                                    | Memoria WASM (CanvasKit) | JS heap | FPS |
+| ---------------------------------------------------------- | ------------------------ | ------- | --- |
+| En marcha, antes de usar el menú                           | 134 MB                   | 30,8 MB | —   |
+| Tras 24 aperturas del menú con cambio de tema (≈75 s, ×30) | 134 MB                   | 33,3 MB | ~40 |
+
+La memoria WASM no se mueve (la foto del fundido de tema se libera) y el JS heap se estabiliza
+(+0,2 MB en las últimas 6 vueltas). Los FPS son por software; en el móvil va por GPU.
+
+### Pendiente de probar en Android
+
+Arrastre de la hoja con el dedo, «atrás», el desenfoque por GPU, el sonido y la doble
+vibración del cambio de fase, y que la entrada no se repita al volver de segundo plano.
+
 ## 1.4 — Pulido de realismo (y retoques 1.3.1)
 
 Retoques visuales tras probar la 1.3 en un móvil real (lo que llamamos **1.3.1**) y el **pulido de
