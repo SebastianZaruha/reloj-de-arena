@@ -32,6 +32,13 @@ export function useThemedBackground(progress: SharedValue<number>, key: Key) {
   }));
 }
 
+/** Estilo animado de color de borde. */
+export function useThemedBorder(progress: SharedValue<number>, key: Key) {
+  const light = L[key];
+  const dark = D[key];
+  return useAnimatedStyle(() => ({ borderColor: interpolateColor(progress.value, [0, 1], [light, dark]) }));
+}
+
 /** Todos los estilos que usan los controles del menú. */
 export function useMenuStyles(progress: SharedValue<number>) {
   return {
@@ -44,6 +51,8 @@ export function useMenuStyles(progress: SharedValue<number>) {
     offBg: useThemedBackground(progress, 'toggleOff'),
     knobBg: useThemedBackground(progress, 'knob'),
     lineBg: useThemedBackground(progress, 'line'),
+    inkSoftBg: useThemedBackground(progress, 'inkSoft'),
+    lineBorder: useThemedBorder(progress, 'inkSoft'),
     grabberBg: useThemedBackground(progress, 'grabber'),
     // Fondo transparente, también como estilo animado. En la web, si un
     // estilo animado desaparece del array, su color se queda «pegado»; por

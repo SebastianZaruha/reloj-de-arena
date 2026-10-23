@@ -84,6 +84,16 @@ export const es = {
   vibration: 'Vibración',
   more: 'Más',
   less: 'Menos',
+  // ─── Ayuda de gestos (1.6) ───
+  gestures: 'Gestos',
+  showGestures: 'Ver los gestos',
+  closeGestures: 'Cerrar gestos',
+  gestureTap: 'Toca para empezar o pausar',
+  gestureSwipe: 'Desliza arriba o abajo con un dedo para elegir el tiempo',
+  gestureHold: 'Mantén pulsado para reiniciar',
+  gestureSide: 'Tumba el móvil de lado para pausar; de pie, sigue',
+  gestureFlip: 'Dale la vuelta para empezar de cero',
+  gestureSheet: 'Arrastra el menú hacia abajo para cerrarlo',
 };
 
 export type Messages = typeof es;
@@ -139,6 +149,15 @@ export const en: Messages = {
   vibration: 'Vibration',
   more: 'More',
   less: 'Less',
+  gestures: 'Gestures',
+  showGestures: 'Show gestures',
+  closeGestures: 'Close gestures',
+  gestureTap: 'Tap to start or pause',
+  gestureSwipe: 'Swipe up or down with one finger to set the time',
+  gestureHold: 'Press and hold to restart',
+  gestureSide: 'Turn the phone on its side to pause; stand it up to resume',
+  gestureFlip: 'Turn it upside down to start over',
+  gestureSheet: 'Drag the menu down to close it',
 };
 
 export const MESSAGES: Readonly<Record<Language, Messages>> = { es, en };

@@ -49,7 +49,7 @@ import {
   type SessionSnapshot,
 } from '@reloj/core';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Pressable,
@@ -65,9 +65,10 @@ import {
   usePanGesture,
   useTapGesture,
 } from 'react-native-gesture-handler';
-import { useDerivedValue, useReducedMotion } from 'react-native-reanimated';
+import { useDerivedValue, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { GesturesHelp } from '../components/GesturesHelp';
 import { HourglassBoundary } from '../components/HourglassBoundary';
 import { FrostedPanel } from '../components/menu/FrostedPanel';
 import { MenuButton } from '../components/menu/MenuButton';
@@ -173,9 +174,39 @@ export function TimerScreen({ settings, fonts }: Props) {
   // ─── Introducción (solo al abrir en frío) y hoja de ajustes ─────────────
   const intro = useIntro(reduceMotion);
   const sheet = useSheet(height, reduceMotion);
-  const timeOpacity = useDerivedValue(() => intro.chrome.value * (1 - sheet.openness.value));
-  const buttonOpacity = useDerivedValue(() => intro.chrome.value * (1 - 0.6 * sheet.openness.value));
+  // Con la ayuda de gestos abierta, el tiempo y el botón del menú se apagan.
+  const helpFade = useSharedValue(0);
+  const timeOpacity = useDerivedValue(
+    () => intro.chrome.value * (1 - sheet.openness.value) * (1 - helpFade.value),
+  );
+  const buttonOpacity = useDerivedValue(
+    () => intro.chrome.value * (1 - 0.6 * sheet.openness.value) * (1 - helpFade.value),
+  );
   const toggleMenu = () => (sheet.open ? sheet.hide() : sheet.show());
+
+  // ─── Ayuda de gestos (1.6): con el «?» del menú y, sola, una vez ────────
+  const [helpOpen, setHelpOpen] = useState(false);
+  const showGestures = () => {
+    sheet.hide();
+    setHelpOpen(true);
+    if (!prefs.gesturesSeen) settings.update({ gesturesSeen: true });
+  };
+  const closeGestures = useCallback(() => setHelpOpen(false), []);
+  useEffect(() => {
+    helpFade.set(withTiming(helpOpen ? 1 : 0, { duration: reduceMotion ? 0 : 260 }));
+  }, [helpOpen, reduceMotion, helpFade]);
+  // Primer arranque: al terminar la entrada, se muestra sola (y queda
+  // guardado que ya se vio, aunque se cierre la app sin cerrarla).
+  const autoHelp = !prefs.gesturesSeen && !intro.active;
+  useEffect(() => {
+    if (!autoHelp) return;
+    const id = setTimeout(() => {
+      setHelpOpen(true);
+      settings.update({ gesturesSeen: true });
+    }, 450);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoHelp]);
 
   // ─── Movimiento (acelerómetro) ──────────────────────────────────────────
   // true si la pausa actual la ha causado tumbar el móvil (solo entonces se
@@ -215,7 +246,7 @@ export function TimerScreen({ settings, fonts }: Props) {
   // dedo (desenfoque ligero, rótulo derecho). En las dos, «Pausa» grande.
   const paused = view.status === 'paused';
   const blurred = tiltPaused && paused;
-  const pauseBlur: PauseBlur = !paused ? 'none' : blurred ? 'full' : 'soft';
+  const pauseBlur: PauseBlur = helpOpen || blurred ? 'full' : paused ? 'soft' : 'none';
 
   // ─── Elegir el tiempo (deslizar y TalkBack) ─────────────────────────────
   /** Duración que se ajusta: la de la sesión única o el TRABAJO de los ciclos. */
@@ -242,7 +273,7 @@ export function TimerScreen({ settings, fonts }: Props) {
   ticker.current ??= new StepTicker();
   // Con el menú abierto, los gestos del reloj se apagan (además, el velo y
   // la hoja lo tapan, así que tampoco recibirían toques).
-  const gesturesOn = !sheet.open;
+  const gesturesOn = !sheet.open && !helpOpen;
 
   const pan = usePanGesture({
     runOnJS: true,
@@ -347,8 +378,8 @@ export function TimerScreen({ settings, fonts }: Props) {
           ]}
           onAccessibilityAction={onAccessibilityAction}
           // Con el menú abierto, el lector de pantalla solo ve el menú.
-          importantForAccessibility={sheet.open ? 'no-hide-descendants' : 'auto'}
-          accessibilityElementsHidden={sheet.open}
+          importantForAccessibility={sheet.open || helpOpen ? 'no-hide-descendants' : 'auto'}
+          accessibilityElementsHidden={sheet.open || helpOpen}
           testID="reloj"
         >
           <HourglassBoundary onReload={() => saveSessionAndReload(latest.current.state)}>
@@ -427,6 +458,7 @@ export function TimerScreen({ settings, fonts }: Props) {
           screenHeight={height}
           safeTop={tilt.flipped ? safe.bottom : safe.top}
           safeBottom={tilt.flipped ? safe.top : safe.bottom}
+          onShowGestures={showGestures}
         />
         <MenuButton
           top={(tilt.flipped ? safe.bottom : safe.top) + 8}
@@ -434,6 +466,16 @@ export function TimerScreen({ settings, fonts }: Props) {
           onPress={toggleMenu}
           opacity={buttonOpacity}
           themeProgress={themeProgress}
+        />
+        <GesturesHelp
+          visible={helpOpen}
+          onClose={closeGestures}
+          theme={theme}
+          themeProgress={themeProgress}
+          fonts={fonts}
+          safeTop={tilt.flipped ? safe.bottom : safe.top}
+          safeBottom={tilt.flipped ? safe.top : safe.bottom}
+          reduceMotion={reduceMotion}
         />
       </View>
     </View>

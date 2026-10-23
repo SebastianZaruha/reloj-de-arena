@@ -46,6 +46,8 @@ export interface Settings {
   readonly haptics: boolean;
   /** Idioma: español, inglés o automático (el del dispositivo) (1.6). */
   readonly language: LanguagePreference;
+  /** ¿Ya se ha visto la ayuda de gestos? (se muestra sola una vez) (1.6) */
+  readonly gesturesSeen: boolean;
   /** Sonido al terminar y al cambiar de fase (1.5). */
   readonly sound: boolean;
   /** Sesión única (un temporizador) o ciclos trabajo/descanso (1.5). */
@@ -68,6 +70,7 @@ export const DEFAULT_SETTINGS: Settings = Object.freeze({
   hourglassModelId: DEFAULT_MODEL_ID,
   theme: 'system',
   language: 'system',
+  gesturesSeen: false,
   haptics: true,
   sound: true,
   sessionMode: 'single',
@@ -98,6 +101,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     theme,
     // 1.6: ajustes anteriores no traen idioma → Automático.
     language: r.language === 'es' || r.language === 'en' || r.language === 'system' ? r.language : 'system',
+    gesturesSeen: r.gesturesSeen === true,
     // Ajustes guardados por versiones anteriores no traen `haptics`: activada.
     haptics: typeof r.haptics === 'boolean' ? r.haptics : DEFAULT_SETTINGS.haptics,
     // Novedades de la 1.5: si no vienen (ajustes de la 1.4), valores por defecto.

@@ -89,6 +89,8 @@ interface Props {
   /** Márgenes seguros (muesca, barra de gestos). */
   readonly safeTop: number;
   readonly safeBottom: number;
+  /** Abre la ayuda de gestos (botón «?» de la cabecera). */
+  readonly onShowGestures: () => void;
 }
 
 export function SettingsSheet({
@@ -101,6 +103,7 @@ export function SettingsSheet({
   screenHeight,
   safeTop,
   safeBottom,
+  onShowGestures,
 }: Props) {
   const t = useT();
   const s = useMenuStyles(themeProgress);
@@ -202,19 +205,35 @@ export function SettingsSheet({
           >
             <Animated.View style={[styles.grabber, s.grabberBg]} />
           </Pressable>
+          {/* Título con el resumen debajo; a la derecha, el «?» de los gestos. */}
           <View style={styles.headRow}>
-            <Animated.Text
-              style={[styles.title, { fontFamily: fonts.medium }, s.ink]}
-              accessibilityRole="header"
+            <View style={styles.headText}>
+              <Animated.Text
+                style={[styles.title, { fontFamily: fonts.medium }, s.ink]}
+                accessibilityRole="header"
+              >
+                {t.settings}
+              </Animated.Text>
+              <Animated.Text
+                style={[styles.summary, { fontFamily: fonts.regular }, s.inkSoft]}
+                numberOfLines={1}
+              >
+                {summary}
+              </Animated.Text>
+            </View>
+            <Pressable
+              onPress={onShowGestures}
+              style={({ pressed }) => [styles.helpTouch, pressed && styles.helpPressed]}
+              accessibilityRole="button"
+              accessibilityLabel={t.showGestures}
+              testID="boton-gestos"
             >
-              {t.settings}
-            </Animated.Text>
-            <Animated.Text
-              style={[styles.summary, { fontFamily: fonts.regular }, s.inkSoft]}
-              numberOfLines={1}
-            >
-              {summary}
-            </Animated.Text>
+              <Animated.View style={[styles.helpRing, s.lineBorder]}>
+                <Animated.Text style={[styles.helpGlyph, { fontFamily: fonts.medium }, s.inkSoft]}>
+                  ?
+                </Animated.Text>
+              </Animated.View>
+            </Pressable>
           </View>
         </View>
       </GestureDetector>
@@ -412,13 +431,27 @@ const styles = StyleSheet.create({
   grabber: { width: 36, height: 4, borderRadius: 2 },
   headRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 4,
-    marginBottom: 18,
+    marginTop: 2,
+    marginBottom: 16,
   },
+  headText: { flexShrink: 1 },
   title: { fontSize: 19, letterSpacing: 0.2 },
-  summary: { fontSize: 12, flexShrink: 1, marginLeft: 12, textAlign: 'right' },
+  summary: { fontSize: 12, marginTop: 3, letterSpacing: 0.2 },
+  // «?» discreto: anillo fino de 28 px con 44 px de área táctil.
+  helpTouch: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: -8 },
+  helpPressed: { opacity: 0.5 },
+  helpRing: {
+    opacity: 0.75,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  helpGlyph: { fontSize: 14, lineHeight: 18 },
   scroll: { flexGrow: 0, flexShrink: 1 },
   body: { paddingHorizontal: 26 },
   section: { marginBottom: 22 },

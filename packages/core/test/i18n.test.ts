@@ -64,4 +64,11 @@ describe('i18n', () => {
     expect(sanitizeSettings({ language: 'en' }).language).toBe('en');
     expect(sanitizeSettings({ language: 'fr' }).language).toBe('system');
   });
+
+  it('la ayuda de gestos se marca como vista y se recuerda', () => {
+    expect(DEFAULT_SETTINGS.gesturesSeen).toBe(false);
+    expect(sanitizeSettings({ version: 2 }).gesturesSeen).toBe(false);
+    expect(sanitizeSettings({ gesturesSeen: true }).gesturesSeen).toBe(true);
+    expect(sanitizeSettings({ gesturesSeen: 'yes' }).gesturesSeen).toBe(false);
+  });
 });
