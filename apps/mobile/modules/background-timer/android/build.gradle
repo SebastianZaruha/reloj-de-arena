@@ -1,0 +1,23 @@
+// Módulo nativo local (Expo Modules API): notificación con la cuenta atrás y
+// avisos en segundo plano. Lo enlaza solo el autolinking de Expo porque está
+// en apps/mobile/modules/ (ver docs/SEGUNDO_PLANO.md).
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.sebastianzaruha.relojdearena'
+version = '1.7.0'
+
+android {
+  namespace "com.sebastianzaruha.relojdearena.background"
+  defaultConfig {
+    versionCode 1
+    versionName '1.7.0'
+  }
+}
+
+dependencies {
+  // Tests de TimerModel en la JVM (sin móvil): ./gradlew :background-timer:testDebugUnitTest
+  testImplementation 'junit:junit:4.13.2'
+}

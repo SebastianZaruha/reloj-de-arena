@@ -1,0 +1,6 @@
+{
+  "platforms": ["android"],
+  "android": {
+    "modules": ["com.sebastianzaruha.relojdearena.background.BackgroundTimerModule"]
+  }
+}

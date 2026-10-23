@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icono de la notificación (barra de estado): un reloj de arena, blanco sobre transparente. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+  <!-- Tapas de arriba y de abajo. -->
+  <path android:fillColor="#FFFFFFFF" android:pathData="M5,2h14v2h-14z" />
+  <path android:fillColor="#FFFFFFFF" android:pathData="M5,20h14v2h-14z" />
+  <!-- Vidrio: dos bulbos unidos por el cuello (contorno). -->
+  <path
+      android:fillColor="#00000000"
+      android:strokeColor="#FFFFFFFF"
+      android:strokeWidth="1.6"
+      android:pathData="M7,4C7,8 10.5,10.5 10.5,12C10.5,13.5 7,16 7,20H17C17,16 13.5,13.5 13.5,12C13.5,10.5 17,8 17,4Z" />
+  <!-- Arena: un poco arriba y el montón de abajo. -->
+  <path android:fillColor="#FFFFFFFF" android:pathData="M9.2,7.2H14.8C14.2,8.6 12.8,9.8 12,10.4C11.2,9.8 9.8,8.6 9.2,7.2Z" />
+  <path android:fillColor="#FFFFFFFF" android:pathData="M8.4,19.2C8.8,17.4 10.4,16.2 12,16C13.6,16.2 15.2,17.4 15.6,19.2Z" />
+</vector>

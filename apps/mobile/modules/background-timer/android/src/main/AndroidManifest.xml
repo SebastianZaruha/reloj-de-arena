@@ -1,0 +1,32 @@
+<!--
+  Permisos y receptores del módulo de segundo plano. Gradle los mezcla con el
+  manifiesto de la app al compilar (no hace falta tocar app.json).
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Android 13+: mostrar notificaciones (se pide al empezar el primer reloj). -->
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <!--
+    Alarmas exactas. En Android 13+ USE_EXACT_ALARM se concede solo (es para
+    apps de alarma o temporizador, como esta). En Android 12 se usa
+    SCHEDULE_EXACT_ALARM, que el usuario puede quitar en Ajustes.
+  -->
+  <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+  <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+  <!-- Al reiniciar el móvil se borran las alarmas: hay que volver a ponerlas. -->
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+  <application>
+    <!-- Cambio de fase o fin: lo despierta AlarmManager a su hora. -->
+    <receiver android:name=".AlarmReceiver" android:exported="false" />
+    <!-- Botones de la notificación: pausar, reanudar, reiniciar. -->
+    <receiver android:name=".ActionReceiver" android:exported="false" />
+    <!-- Reinicio del móvil, actualización de la app o permiso de alarmas cambiado. -->
+    <receiver android:name=".RestoreReceiver" android:exported="false">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+        <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+      </intent-filter>
+    </receiver>
+  </application>
+</manifest>

@@ -19,6 +19,8 @@ apps/mobile/public/canvaskit.wasm
 # No contienen nada editado a mano (los permisos bloqueados están en app.json).
 /apps/mobile/android/
 /apps/mobile/ios/
+# Compilación de los módulos nativos locales (apps/mobile/modules/*/android)
+/apps/mobile/modules/*/android/build/
 .kotlin/
 .gradle/
 .cxx/
