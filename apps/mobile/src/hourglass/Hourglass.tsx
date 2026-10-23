@@ -98,10 +98,25 @@ export interface HourglassProps {
   readonly poseActive?: boolean;
   /**
    * Elementos Skia que se dibujan encima del reloj, en el mismo lienzo (el
-   * vidrio esmerilado del menú: así puede desenfocar lo que hay debajo).
-   * Giran con el móvil volteado, pero no se desenfocan en la pausa.
+   * vidrio esmerilado del menú). Giran con el móvil volteado, pero no se
+   * desenfocan en la pausa. Si es una función, recibe la escena
+   * (`HourglassScene`) para volver a dibujarla (p. ej. desenfocada).
    */
-  readonly children?: ReactNode;
+  readonly children?: ReactNode | ((scene: HourglassScene) => ReactNode);
+}
+
+/**
+ * La escena del reloj como elementos Skia, para que un hijo la vuelva a
+ * dibujar (1.8.1): el vidrio del menú dibuja el fondo y una copia
+ * desenfocada del reloj en su recorte, en vez de leer la pantalla ya
+ * dibujada con un BackdropBlur (que en las GPU de los móviles obliga a
+ * cortar el fotograma por la mitad y es lo más caro de todo).
+ */
+export interface HourglassScene {
+  /** El fondo (degradado muy suave, opaco). */
+  readonly background: ReactNode;
+  /** La sombra y el reloj (cuerpo, arena y reflejos), con su pose. */
+  readonly subject: ReactNode;
 }
 
 function HourglassComponent(props: HourglassProps) {
@@ -262,21 +277,32 @@ function HourglassCanvas({
   const canvasRef = useCanvasRef();
   const fade = useThemeCrossfade(canvasRef, theme, reduceMotion);
 
+  // La sombra y el reloj: se dibujan aquí y, si un hijo lo pide, otra vez.
+  const subject = (
+    <>
+      <Group layer={shadowLayer}>
+        <Picture picture={shadow} />
+      </Group>
+      <Group transform={objectTransform} origin={center} layer={objectLayer}>
+        <Picture picture={body} />
+        <Picture picture={sand} />
+        <Picture picture={front} />
+      </Group>
+    </>
+  );
+  const extra =
+    typeof children === 'function'
+      ? children({ background: <Picture picture={background} />, subject })
+      : children;
+
   return (
     <Canvas ref={canvasRef} style={{ width, height }}>
       <Group transform={transform} origin={origin}>
         <Picture picture={background} />
         <Group layer={layer} clip={blurLayerOn && !poseActive ? blurClip : undefined}>
-          <Group layer={shadowLayer}>
-            <Picture picture={shadow} />
-          </Group>
-          <Group transform={objectTransform} origin={center} layer={objectLayer}>
-            <Picture picture={body} />
-            <Picture picture={sand} />
-            <Picture picture={front} />
-          </Group>
+          {subject}
         </Group>
-        {children}
+        {extra}
       </Group>
       {fade.image ? (
         <Image
