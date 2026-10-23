@@ -433,22 +433,20 @@ export function TimerScreen({ settings, fonts }: Props) {
   // El vidrio del menú va DENTRO del lienzo del reloj. Memorizado: si no, cada
   // render de la pantalla sería un hijo «nuevo» y el lienzo Skia entero se
   // volvería a reconciliar aunque no cambie nada.
-  // Recibe la escena del reloj para dibujarla desenfocada detrás del vidrio.
-  const frosted = useMemo(
-    () =>
-      sheet.visible
-        ? (scene: HourglassScene) => (
-            <FrostedPanel
-              width={width}
-              height={height}
-              top={sheet.top}
-              openness={sheet.openness}
-              themeProgress={themeProgress}
-              scene={scene}
-            />
-          )
-        : null,
-    [sheet.visible, sheet.top, sheet.openness, width, height, themeProgress],
+  // El vidrio está siempre montado (1.8.2): abrir la hoja no monta nada en el
+  // lienzo. Recibe del reloj la foto desenfocada de la escena.
+  const frosted = useCallback(
+    (scene: HourglassScene) => (
+      <FrostedPanel
+        width={width}
+        height={height}
+        top={sheet.top}
+        openness={sheet.openness}
+        themeProgress={themeProgress}
+        scene={scene}
+      />
+    ),
+    [sheet.top, sheet.openness, width, height, themeProgress],
   );
   // En imagen en imagen no hay textos ni menú: el reloj ocupa toda la ventanita.
   const insets = useMemo(
@@ -502,6 +500,7 @@ export function TimerScreen({ settings, fonts }: Props) {
               reduceMotion={reduceMotion}
               pose={intro.pose}
               poseActive={intro.active}
+              backdropActive={sheet.visible}
             >
               {frosted}
             </Hourglass>

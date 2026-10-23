@@ -11,39 +11,33 @@
  * Capas:
  *   1. Velo muy suave sobre toda la pantalla (aparece al abrir).
  *   2. Sombra difusa encima del canto de la hoja.
- *   3. Dentro de la forma de la hoja: el fondo, una copia DESENFOCADA del
- *      reloj y su sombra (`scene`, la da <Hourglass>), el velo y el tinte.
+ *   3. Dentro de la forma de la hoja: la foto desenfocada de la escena
+ *      (`scene.backdrop`, la prepara <Hourglass>), el velo y el tinte.
  *   4. Brillo de 1 px en el canto superior (como el canto de un vidrio).
  *
- * 1.8.1, coste: hasta la 1.8 la capa 3 era un BackdropBlur, que lee la
- * pantalla ya dibujada. En las GPU de los móviles (que pintan por
- * «baldosas») eso obliga a terminar el fotograma a medias, copiarlo y
- * seguir: lo más caro de todo, en cada fotograma con la arena moviéndose.
- * El fondo es un degradado muy suave (desenfocado se ve igual), así que
- * basta con volver a dibujarlo y desenfocar solo el reloj en una capa
- * propia: el mismo aspecto, sin leer la pantalla.
+ * Coste (1.8.2): la GPU solo estira una imagen pequeña. Hasta la 1.8 era un
+ * BackdropBlur (leer la pantalla ya dibujada, carísimo en los móviles) y en
+ * la 1.8.1 una copia desenfocada del reloj, que al abrir obligaba a la GPU a
+ * preparar shaders nuevos: la hoja tardaba ~2 s en salir en un Samsung A55.
+ * Ver hourglass/frostedBackdrop.ts.
  *
- * En la web se sigue usando BackdropBlur: el navegador dibuja con la GPU del
- * PC (o por software), donde copiar la pantalla es barato y volver a pintar
- * los shaders del reloj sale más caro (medido: ~25 fps frente a ~15 con la
- * CPU 4 veces más lenta). Las dos formas se ven igual (diferencia ≤ 5/255).
- *
- * Solo se monta mientras la hoja está abierta o animándose.
+ * Está SIEMPRE montado (1.8.2): con la hoja cerrada todo queda fuera de la
+ * pantalla o con opacidad 0, y Skia no dibuja nada. Así abrir no monta nada
+ * en el lienzo y el primer fotograma ya sale completo.
  */
 import {
-  BackdropBlur,
-  Blur,
+  FilterMode,
+  Image,
+  MipmapMode,
   Fill,
   Group,
   LinearGradient,
-  Paint,
   Rect,
   RoundedRect,
   rect,
   rrect,
   vec,
 } from '@shopify/react-native-skia';
-import { Platform } from 'react-native';
 import { interpolateColor, useDerivedValue, type SharedValue } from 'react-native-reanimated';
 
 import type { HourglassScene } from '../../hourglass';
@@ -51,10 +45,8 @@ import { DARK_THEME, LIGHT_THEME } from '../../theme/theme';
 
 /** Radio de las esquinas superiores de la hoja. */
 export const SHEET_RADIUS = 30;
-/** Desenfoque del vidrio (px). */
-const BLUR = 26;
-/** Redibujar la escena desenfocada (móvil) o leer la pantalla (web). */
-const REDRAW_SCENE = Platform.OS !== 'web';
+/** La foto es pequeña: se estira con filtrado lineal (ya está desenfocada). */
+const SMOOTH = { filter: FilterMode.Linear, mipmap: MipmapMode.None } as const;
 /** Alto de la sombra sobre el canto. */
 const SHADOW_H = 28;
 
@@ -70,7 +62,7 @@ interface Props {
   readonly openness: SharedValue<number>;
   /** 0 = tema claro, 1 = oscuro (animado). */
   readonly themeProgress: SharedValue<number>;
-  /** La escena del reloj, para dibujarla desenfocada detrás del vidrio. */
+  /** La escena del reloj: su foto desenfocada para detrás del vidrio. */
   readonly scene: HourglassScene;
 }
 
@@ -103,26 +95,19 @@ export function FrostedPanel({ width, height, top, openness, themeProgress, scen
       <Rect rect={shadowRect}>
         <LinearGradient start={shadowStart} end={shadowEnd} colors={shadowColors} />
       </Rect>
-      {REDRAW_SCENE ? (
-        <Group clip={shape}>
-          {scene.background}
-          <Group
-            layer={
-              <Paint>
-                <Blur blur={BLUR} mode="decal" />
-              </Paint>
-            }
-          >
-            {scene.subject}
-          </Group>
-          <Fill color={scrim} opacity={openness} />
-          <Fill color={tint} />
-        </Group>
-      ) : (
-        <BackdropBlur blur={BLUR} clip={shape}>
-          <Fill color={tint} />
-        </BackdropBlur>
-      )}
+      <Group clip={shape}>
+        <Image
+          image={scene.backdrop}
+          x={0}
+          y={0}
+          width={width}
+          height={height}
+          fit="fill"
+          sampling={SMOOTH}
+        />
+        <Fill color={scrim} opacity={openness} />
+        <Fill color={tint} />
+      </Group>
       <Group clip={edgeBand}>
         <RoundedRect rect={shape} style="stroke" strokeWidth={1} color={edge} />
       </Group>

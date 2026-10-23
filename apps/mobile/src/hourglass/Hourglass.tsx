@@ -32,7 +32,17 @@
  * con un pequeño retraso (ver disposal.ts). Nada vive a nivel de módulo.
  */
 import { SandSimulation, type ContentDefinition, type HourglassModel, type TimerStatus } from '@reloj/core';
-import { Blur, Canvas, Group, Image, Paint, Picture, rect, useCanvasRef } from '@shopify/react-native-skia';
+import {
+  Blur,
+  Canvas,
+  Group,
+  Image,
+  Paint,
+  Picture,
+  rect,
+  useCanvasRef,
+  type SkImage,
+} from '@shopify/react-native-skia';
 import { memo, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 import { useDerivedValue, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
@@ -40,6 +50,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 
 import type { HourglassTheme } from '../theme/theme';
 import { disposeLater } from './disposal';
+import { useFrostedBackdrop } from './frostedBackdrop';
 import { computeLayout, isUsableSize, type LayoutInsets } from './layout';
 import { createShaderSet, shaderSetDisposables } from './resources';
 import { SandPainter, buildPaletteLut } from './sandPainter';
@@ -100,23 +111,20 @@ export interface HourglassProps {
    * Elementos Skia que se dibujan encima del reloj, en el mismo lienzo (el
    * vidrio esmerilado del menú). Giran con el móvil volteado, pero no se
    * desenfocan en la pausa. Si es una función, recibe la escena
-   * (`HourglassScene`) para volver a dibujarla (p. ej. desenfocada).
+   * (`HourglassScene`): la foto desenfocada para el vidrio.
    */
   readonly children?: ReactNode | ((scene: HourglassScene) => ReactNode);
+  /** ¿Se ve el vidrio del menú? Mientras tanto se renueva su foto (1.8.2). */
+  readonly backdropActive?: boolean;
 }
 
 /**
- * La escena del reloj como elementos Skia, para que un hijo la vuelva a
- * dibujar (1.8.1): el vidrio del menú dibuja el fondo y una copia
- * desenfocada del reloj en su recorte, en vez de leer la pantalla ya
- * dibujada con un BackdropBlur (que en las GPU de los móviles obliga a
- * cortar el fotograma por la mitad y es lo más caro de todo).
+ * Lo que el reloj ofrece a sus hijos (1.8.2): una foto pequeña y ya
+ * desenfocada del fondo y el reloj (ver frostedBackdrop.ts), para pintar el
+ * vidrio del menú sin desenfocar nada en la GPU.
  */
 export interface HourglassScene {
-  /** El fondo (degradado muy suave, opaco). */
-  readonly background: ReactNode;
-  /** La sombra y el reloj (cuerpo, arena y reflejos), con su pose. */
-  readonly subject: ReactNode;
+  readonly backdrop: SharedValue<SkImage | null>;
 }
 
 function HourglassComponent(props: HourglassProps) {
@@ -144,6 +152,7 @@ function HourglassCanvas({
   pose,
   poseActive = false,
   children,
+  backdropActive = false,
 }: HourglassProps) {
   // Si el bucle de dibujo falla (fuera del render), lo relanzamos DENTRO del
   // render para que lo capture el error boundary que nos envuelve.
@@ -277,30 +286,48 @@ function HourglassCanvas({
   const canvasRef = useCanvasRef();
   const fade = useThemeCrossfade(canvasRef, theme, reduceMotion);
 
-  // La sombra y el reloj: se dibujan aquí y, si un hijo lo pide, otra vez.
-  const subject = (
-    <>
-      <Group layer={shadowLayer}>
-        <Picture picture={shadow} />
-      </Group>
-      <Group transform={objectTransform} origin={center} layer={objectLayer}>
-        <Picture picture={body} />
-        <Picture picture={sand} />
-        <Picture picture={front} />
-      </Group>
-    </>
-  );
-  const extra =
-    typeof children === 'function'
-      ? children({ background: <Picture picture={background} />, subject })
-      : children;
+  // Foto desenfocada para el vidrio del menú (1.8.2). La pose es la del reloj
+  // en reposo, con el giro del cambio de fase (la intro no coincide con el menú).
+  const backdrop = useFrostedBackdrop({
+    width,
+    height,
+    active: backdropActive,
+    version: glass,
+    read: () => {
+      const angle = spin.get();
+      const s = Math.abs(Math.sin(angle));
+      const c = Math.abs(Math.cos(angle));
+      const fit = Math.min(1, roomW / (objH * s + objW * c));
+      const lift = Math.abs(Math.sin(angle));
+      return {
+        background: background.get(),
+        shadow: shadow.get(),
+        body: body.get(),
+        sand: sand.get(),
+        front: front.get(),
+        cx: layout.cx,
+        cy: layout.cy,
+        scale: fit * (1 - 0.04 * lift),
+        angle,
+      };
+    },
+  });
+  const scene = useMemo(() => ({ backdrop }), [backdrop]);
+  const extra = typeof children === 'function' ? children(scene) : children;
 
   return (
     <Canvas ref={canvasRef} style={{ width, height }}>
       <Group transform={transform} origin={origin}>
         <Picture picture={background} />
         <Group layer={layer} clip={blurLayerOn && !poseActive ? blurClip : undefined}>
-          {subject}
+          <Group layer={shadowLayer}>
+            <Picture picture={shadow} />
+          </Group>
+          <Group transform={objectTransform} origin={center} layer={objectLayer}>
+            <Picture picture={body} />
+            <Picture picture={sand} />
+            <Picture picture={front} />
+          </Group>
         </Group>
         {extra}
       </Group>
