@@ -82,8 +82,22 @@ object TimerNotifications {
    * Crea los canales que hacen falta ahora y actualiza el nombre (idioma) de
    * los que ya existían. Crear un canal que ya existe solo cambia su nombre.
    */
+  /** Con qué textos y ajustes se crearon los canales (para no repetirlo en cada envío). */
+  @Volatile private var channelsKey: String? = null
+
   fun ensureChannels(context: Context, state: StoredState) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+    // Crear canales son varias llamadas al sistema: solo si cambian los
+    // textos (idioma) o el canal de aviso que toca (sonido/vibración).
+    val key = listOf(
+      state.text("channelCountdown", ""),
+      state.text("channelFinished", ""),
+      state.text("channelPhase", ""),
+      state.text("channelSoundOnly", ""),
+      state.text("channelVibrationOnly", ""),
+      Alert.values().joinToString { currentAlertChannel(it, state) },
+    ).joinToString("|")
+    if (key == channelsKey) return
     val nm = manager(context)
     nm.createNotificationChannel(
       NotificationChannel(CHANNEL_COUNTDOWN, state.text("channelCountdown", "Cuenta atrás"), NotificationManager.IMPORTANCE_LOW).apply {
@@ -100,6 +114,7 @@ object TimerNotifications {
         }
       }
     }
+    channelsKey = key
   }
 
   private fun alertChannel(

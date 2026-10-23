@@ -1,7 +1,10 @@
 package com.sebastianzaruha.relojdearena.background
 
 import android.content.Context
+import android.os.Handler
+import android.os.HandlerThread
 import org.json.JSONObject
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * El «director» del segundo plano: junta el estado guardado, las alarmas y
@@ -16,8 +19,16 @@ import org.json.JSONObject
  * Después de cada cambio se avisa a la ventana flotante (`FloatingWindow`),
  * que decide si se ve y se repinta con la sesión nueva.
  *
- * Todo es rápido (leer/escribir unas preferencias y pintar una notificación),
- * así que se hace directamente en el receptor, sin servicios en primer plano.
+ * Hilos (1.8.1): `sync` lo llama JavaScript EN SU HILO y de forma síncrona.
+ * Guardar en disco, programar la alarma y pintar la notificación son llamadas
+ * al sistema que en un móvil pueden tardar decenas de milisegundos, justo al
+ * empezar, pausar o voltear (cuando la app anima). Por eso `sync` solo
+ * comprueba `seq` y deja el trabajo a un hilo propio (`worker`); si llegan
+ * varios envíos seguidos, solo se aplica el último. Todo lo que cambia el
+ * estado (envío, botón, alarma, reinicio) pasa por el mismo `lock`, así que
+ * nunca se pisan.
+ *
+ * Sin servicios en primer plano: los receptores hacen su trabajo al momento.
  */
 object BackgroundTimer {
   /**
@@ -33,27 +44,56 @@ object BackgroundTimer {
   /** Lo pone el módulo de Expo para avisar a la app de cambios hechos aquí. */
   @Volatile var listener: ((seq: Int) -> Unit)? = null
 
+  /** Un solo cambio de estado a la vez (envío de la app, botón, alarma, reinicio). */
+  private val lock = Any()
+
+  /** Hilo para el trabajo de `sync` (fuera del hilo de JavaScript y del de la interfaz). */
+  private val worker: Handler by lazy {
+    val thread = HandlerThread("reloj-segundo-plano").apply { start() }
+    Handler(thread.looper)
+  }
+
+  /** Último envío de la app aún sin aplicar (los anteriores ya no importan). */
+  private val pending = AtomicReference<String?>(null)
+
   /**
    * Lo que manda la app. Devuelve false si el envío es anterior a un cambio
    * hecho desde la notificación (la app aún no lo conocía): no se aplica y
    * la app debe leer `snapshot` y ponerse al día.
    */
   fun sync(context: Context, json: String): Boolean {
-    val payload = JSONObject(json)
-    val seq = TimerStore.seq(context)
-    if (payload.optInt("seenSeq", 0) < seq) return false
-    // Si la app avisa justo después de un cambio de fase, la alarma de ese
-    // cambio aún no ha sonado y el envío la cancelaría: se atiende antes.
-    TimerStore.load(context)?.let { advance(context, it, System.currentTimeMillis()) }
-    val state = StoredState(payload, seq)
-    TimerStore.save(context, state)
-    render(context, state, state.session, state.events)
-    FloatingWindow.update(context, FloatingEvent.STATE_CHANGED)
+    if (JSONObject(json).optInt("seenSeq", 0) < TimerStore.seq(context)) return false
+    val app = context.applicationContext
+    // Si ya había uno esperando, el hilo lo cambiará por este: no hace falta otro aviso.
+    if (pending.getAndSet(json) == null) worker.post { applyPending(app) }
     return true
+  }
+
+  /** En el hilo `worker`: aplica el último envío de la app. */
+  private fun applyPending(context: Context) {
+    val json = pending.getAndSet(null) ?: return
+    synchronized(lock) {
+      val payload = JSONObject(json)
+      val seq = TimerStore.seq(context)
+      // Entre `sync` y ahora se ha pulsado un botón: la app se pondrá al día
+      // (le llega `onChange`) y volverá a enviar.
+      if (payload.optInt("seenSeq", 0) < seq) return
+      // Si la app avisa justo después de un cambio de fase, la alarma de ese
+      // cambio aún no ha sonado y el envío la cancelaría: se atiende antes.
+      TimerStore.load(context)?.let { advance(context, it, System.currentTimeMillis()) }
+      val state = StoredState(payload, seq)
+      TimerStore.save(context, state)
+      render(context, state, state.session, state.events)
+      FloatingWindow.update(context, FloatingEvent.STATE_CHANGED)
+    }
   }
 
   /** Un botón de la notificación (ActionReceiver). */
   fun onAction(context: Context, action: String) {
+    synchronized(lock) { onActionLocked(context, action) }
+  }
+
+  private fun onActionLocked(context: Context, action: String) {
     val state = TimerStore.load(context) ?: return
     val session = state.session
     if (session == null || session.isFinished) {
@@ -77,14 +117,19 @@ object BackgroundTimer {
 
   /** Ha llegado la hora de un aviso (AlarmReceiver). `at` es la hora prevista. */
   fun onAlarm(context: Context, at: Long) {
+    synchronized(lock) { onAlarmLocked(context, at) }
+  }
+
+  private fun onAlarmLocked(context: Context, at: Long) {
     val state = TimerStore.load(context) ?: return
     // Si Android la entrega unos milisegundos antes, cuenta como a su hora.
     val updated = advance(context, state, maxOf(System.currentTimeMillis(), at))
+    // Solo hay una alarma programada (la del próximo aviso): ahora, la siguiente.
+    updated.session?.let { if (it.isRunning) TimerAlarms.schedule(context, TimerModel.events(it)) }
     // Fin: se quita. Cambio de fase: la ventana ya gira sola; si el proceso
     // había muerto, aquí vuelve a aparecer.
     FloatingWindow.update(context, FloatingEvent.STATE_CHANGED)
     val session = updated.session ?: return
-    // Las alarmas que faltan ya están programadas: solo cambia la notificación.
     if (session.isRunning || session.isPaused) TimerNotifications.showCountdown(context, updated, session)
   }
 
@@ -117,6 +162,10 @@ object BackgroundTimer {
    * actualizar la app o al cambiar el permiso de alarmas exactas.
    */
   fun restore(context: Context) {
+    synchronized(lock) { restoreLocked(context) }
+  }
+
+  private fun restoreLocked(context: Context) {
     val state = advance(context, TimerStore.load(context) ?: return, System.currentTimeMillis())
     val session = state.session ?: return
     render(context, state, session, TimerModel.events(session))
