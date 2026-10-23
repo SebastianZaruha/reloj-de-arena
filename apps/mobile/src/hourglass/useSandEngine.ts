@@ -1,7 +1,8 @@
 /**
  * Bucle de animación del reloj.
  *
- * En cada fotograma (requestAnimationFrame, ~60 por segundo):
+ * En cada fotograma (al ritmo que pide la interfaz, ver useFramePacer;
+ * ~60 por segundo si el móvil puede):
  *  0. Si se ha volteado el móvil, la arena da la vuelta (rotateHalfTurn) y el
  *     dibujo gira 180° en el MISMO fotograma (para que no se vea un salto).
  *  1. Pregunta al temporizador cuánto tiempo queda (calculado a partir de
@@ -53,6 +54,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSharedValue, type SharedValue } from 'react-native-reanimated';
 
 import { useLatest } from '../hooks/useLatest';
+import { useFramePacer } from './useFramePacer';
 import { PictureSlot, recordEmptyPicture } from './pictureSlot';
 import type { SandPainter, StreamState } from './sandPainter';
 import type { GlassPainter } from './staticLayers';
@@ -105,6 +107,13 @@ const MAX_CATCH_UP = 3;
 const IDLE_CRATER = 0.25;
 /** Cambio mínimo de inclinación para regrabar las capas del vidrio (más pequeño no se ve). */
 const LIGHT_EPSILON = 0.01;
+/**
+ * Como mucho, una regrabación del vidrio cada tanto (ms; ~20 por segundo).
+ * La luz y los reflejos se mueven despacio con la inclinación: a 20 fps se
+ * ven igual de suaves y son cuatro capas menos que grabar y subir por
+ * fotograma al sostener el móvil en la mano (1.8.1).
+ */
+const GLASS_MIN_MS = 50;
 
 export function useSandEngine(params: SandEngineParams): SandEngineOutput {
   const { sim, status, durationMs, motion } = params;
@@ -140,8 +149,12 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
   );
   const initialRef = useLatest(initialGrains);
 
+  // Quien da paso al siguiente fotograma: la interfaz, cuando ha dibujado el anterior.
+  const pacer = useFramePacer();
+
   const loop = useRef({
-    raf: null as number | null,
+    /** ¿Hay un fotograma pedido? */
+    scheduled: false,
     dirty: true,
     failed: false,
     /** Simulación ya rellenada de arena (para detectar simulaciones nuevas). */
@@ -162,6 +175,10 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
     glass: null as GlassPainter | null,
     lightX: Number.NaN,
     lightY: Number.NaN,
+    /** Cuándo se grabó el vidrio por última vez (performance.now). */
+    glassAt: 0,
+    /** La luz ha cambiado pero aún no tocaba regrabar: queda pendiente. */
+    glassPending: false,
     /** Estado del chorro reutilizado en cada fotograma (sin crear objetos). */
     stream: { flowing: false, particles: null, reduceMotion: false } as StreamState,
     /** Entrada de las partículas, reutilizada en cada fotograma. */
@@ -180,7 +197,7 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
   const wake = useCallback(() => {
     const state = loop.current;
     state.dirty = true;
-    if (state.raf !== null || state.failed) return;
+    if (state.scheduled || state.failed) return;
 
     /** Fin del giro: la rejilla da la vuelta y el dibujo vuelve a 0, a la vez. */
     const finishTurn = (sim: SandSimulation) => {
@@ -194,7 +211,7 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
     };
 
     const frame = () => {
-      state.raf = null;
+      state.scheduled = false;
       try {
         runFrame();
       } catch (error) {
@@ -319,11 +336,13 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
 
       // 4a) Vidrio: regrabamos si cambió el pintor (tamaño/tema) o la luz.
       const t = m.tilt;
-      if (
-        state.glass !== p.glass ||
-        Math.abs(t.x - state.lightX) > LIGHT_EPSILON ||
-        Math.abs(t.y - state.lightY) > LIGHT_EPSILON
-      ) {
+      const newGlass = state.glass !== p.glass;
+      const lightMoved =
+        Math.abs(t.x - state.lightX) > LIGHT_EPSILON || Math.abs(t.y - state.lightY) > LIGHT_EPSILON;
+      const glassDue = newGlass || (lightMoved && now - state.glassAt >= GLASS_MIN_MS);
+      state.glassPending = lightMoved && !glassDue;
+      if (glassDue) {
+        state.glassAt = now;
         slots.background.publish(p.glass.recordBackground(t));
         slots.shadow.publish(p.glass.recordShadow(t));
         slots.body.publish(p.glass.recordBody(t));
@@ -346,12 +365,20 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
 
       // ¿Seguimos? Mientras corre el tiempo o la arena se mueve, sí.
       const keepGoing =
-        snap.status === 'running' || !p.sim.isSettled || state.dirty || particles.active || turning;
-      if (keepGoing) state.raf = requestAnimationFrame(frame);
-      else state.lastTime = 0;
+        snap.status === 'running' ||
+        !p.sim.isSettled ||
+        state.dirty ||
+        particles.active ||
+        turning ||
+        state.glassPending;
+      if (keepGoing) {
+        state.scheduled = true;
+        pacer.request(frame);
+      } else state.lastTime = 0;
     };
-    state.raf = requestAnimationFrame(frame);
-  }, [live, initialRef, particles, rotation, spin, slots]);
+    state.scheduled = true;
+    pacer.request(frame);
+  }, [live, initialRef, particles, rotation, spin, slots, pacer]);
 
   // Al elegir duración (o reiniciar), colocamos la arena directamente.
   useEffect(() => {
@@ -385,8 +412,8 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
     const state = loop.current;
     state.failed = false;
     return () => {
-      if (state.raf !== null) cancelAnimationFrame(state.raf);
-      state.raf = null;
+      if (state.scheduled) pacer.cancel();
+      state.scheduled = false;
       state.dirty = true;
       state.glass = null;
       slots.background.release();
@@ -395,7 +422,7 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
       slots.sand.release();
       slots.front.release();
     };
-  }, [slots]);
+  }, [slots, pacer]);
 
   return { background, shadow, body, sand, front, rotation, spin };
 }
