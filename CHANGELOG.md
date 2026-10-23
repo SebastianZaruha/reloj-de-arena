@@ -9,6 +9,74 @@ funcionamiento interno en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md).
 > APK de desarrollo. A partir de la publicación en GitHub basta con `git pull`; las
 > instrucciones «Cómo actualizar» se conservan como referencia.
 
+## 1.8.3 — Diagnóstico del menú en el móvil (APK de pruebas)
+
+En la 1.8.2 el menú sigue tardando ~2 s en abrirse en el Samsung A55 (en el PC va perfecto),
+mientras la arena sigue fluida: no es falta de potencia, es algo del camino de abrir en Android.
+Sin un Android aquí, esta versión **mide en el propio móvil** y permite probar alternativas sin
+reinstalar.
+
+### Diagnóstico oculto
+
+- **Pulsación larga (1,2 s) en el título «Ajustes»** lo enciende o lo apaga. Se recuerda al
+  cerrar la app (clave propia, fuera de los ajustes).
+- **Recuadro arriba a la izquierda**, encima de todo: fps de JS y de la interfaz, si Reanimated
+  mueve las vistas directamente («props directas»), si hay servicios de accesibilidad, y las
+  3 últimas aperturas en ms desde que el toque llega a JS: nativo→JS, soltar, `onPress`,
+  `show`, render y commit de la pantalla, vidrio montado en el lienzo, primer fotograma con el
+  valor animado movido, **cuándo el árbol de vistas tiene ya la hoja movida** (`measure`), hoja
+  arriba y fin de la animación; paradas de más de 50 ms de cada hilo y llamadas al módulo
+  nativo durante la apertura.
+- **Sección «Diagnóstico» al final del menú:** vidrio _Al abrir_ (`BackdropBlur` montado al
+  abrir, lo normal), _Premontado_ (montado desde el arranque) o _Sin desenfoque_ (panel del
+  color del tema, sin leer la pantalla); **Hoja sin animación**; **Arena quieta con el menú**;
+  _Borrar mediciones_.
+- Apagado no cuesta nada (solo guarda un número por marca). El código está en `src/dev/`.
+
+### Qué cambia aparte del diagnóstico
+
+- El aviso «Ajustes» para el lector de pantalla solo se envía si el lector está encendido.
+
+### Revisión del camino de abrir (desde la 1.6, 61481a5)
+
+- **Sin `Modal` ni ventanas nuevas:** la hoja es una vista más del árbol, montada desde el
+  arranque.
+- **Ninguna llamada nativa al abrir:** los permisos (`getPermissions`) y la imagen en imagen se
+  leen al montar la pantalla (inicializador de `useState`, una sola vez) y al volver a la app;
+  `sync` solo se llama si cambia la sesión, el idioma o un interruptor, y aun así solo si el
+  JSON cambia. El diagnóstico lo cuenta en el móvil.
+- **Lo que pasa al abrir:** la pantalla se re-renderiza una vez (`open`/`visible`), se monta
+  el vidrio en el lienzo de Skia (en Android eso vuelve a grabar la escena del lienzo y crea
+  un _mapper_ nuevo de Reanimated; en la web no) y Reanimated anima `translateY`. En Android,
+  mientras React aplica un commit, Reanimated **pausa** sus propios commits de estilos (los
+  reanuda cuando Android monta ese commit); el vidrio de Skia no pasa por ahí. Es el
+  principal sospechoso de un retraso solo en Android con los dos hilos libres.
+- **Variante de prueba `reloj-de-arena-1.8.3-dev-sync.apk`:** igual, pero compilada con
+  `ANDROID_SYNCHRONOUSLY_UPDATE_UI_PROPS` de Reanimated (en `apps/mobile/package.json`,
+  `"reanimated": { "staticFeatureFlags": { … : true } }`; no está en el repositorio): el
+  `transform` y la opacidad se aplican directamente a las vistas, sin esperar a esa pausa.
+
+### Medido (web de producción, con el propio diagnóstico)
+
+Render y commit de la pantalla al abrir: 5–9 ms; vidrio montado: 9–13 ms; primer fotograma
+movido: 18–33 ms; ninguna llamada nativa. Los tres modos de vidrio, igual. 30/30 aperturas al
+primer toque en cada estado (mediana 23–37 ms).
+
+### Restaurar la sesión al reabrir
+
+Con el reloj **sin empezar** la app arranca de cero a propósito (solo se guarda una sesión en
+marcha o en pausa). Comprobado que la duración elegida (tiempos rápidos y deslizando) y el ciclo
+sí se conservan al reabrir.
+
+### Cómo actualizar desde la 1.8.2
+
+Instala `reloj-de-arena-1.8.3-dev.apk` (misma firma). Para comparar, después
+`reloj-de-arena-1.8.3-dev-sync.apk` encima: conserva ajustes y diagnóstico.
+
+### Pruebas
+
+- Core: 189 tests; módulo Kotlin: 35 tests. `npm run check` limpio.
+
 ## 1.8.2 — El menú se abre al primer toque
 
 Con la 1.8.1, en el Samsung A55 el botón del menú se iluminaba al tocarlo, pero la hoja salía

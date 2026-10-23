@@ -395,6 +395,9 @@ constante se ignora.
   en ese móvil siempre fue fluido; los tirones de la 1.8 venían de otras cosas (ver 1.8.1).
   Encima, transparente, va el contenido en React Native. Como los dos se mueven con el mismo
   shared value (`offset`), van pegados al píxel, también al arrastrar.
+- **Diagnóstico oculto (1.8.3):** pulsación larga en el título «Ajustes». Mide cada apertura
+  en el móvil y deja probar otros vidrios, la hoja sin animación y la arena quieta (ver
+  `src/dev/diagnostics.ts` y el CHANGELOG).
 - **El botón no se «rebota» (1.8.2):** `SheetToggle` (core) guarda si la hoja está abierta al
   momento y, mientras se anima, ignora los toques del botón. Abrir una hoja abierta no hace
   nada. «Pausa» se apaga mientras la hoja o una ayuda está delante (su vidrio está en el
