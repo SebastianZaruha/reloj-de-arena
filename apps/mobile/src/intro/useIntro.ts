@@ -63,6 +63,15 @@ export function useIntro(reduceMotion: boolean): Intro {
   const chrome = useSharedValue(play ? 0 : 1);
 
   useEffect(() => {
+    // En desarrollo, por qué no gira (p. ej. Android con las animaciones
+    // desactivadas: Reanimated lo ve como «reducir movimiento»).
+    if (__DEV__ && !animate) {
+      console.log(
+        play
+          ? '[intro] sin giro: el sistema pide reducir movimiento (¿animaciones desactivadas?); solo fundido'
+          : '[intro] sin giro: ya se mostró en este proceso (volver de segundo plano / remontaje)',
+      );
+    }
     if (!play) return;
     introPlayed = true;
     // Al terminar, avisamos a React (en el hilo de JS) para quitar las capas.
