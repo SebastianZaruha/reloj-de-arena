@@ -290,6 +290,12 @@ export class SandSimulation {
       const p = rng() < w ? d2 : d1;
       if (this.moveTo(idx, x + dx(p), y + dy(p), s)) {
         moves++;
+        // Si cae al VACÍO (también está libre la celda siguiente), la columna
+        // que tenía encima cae con él en el MISMO paso (ver `followColumn`):
+        // así una masa de arena baja entera, sin rayas. Si solo rellena un
+        // hueco de una celda (un cráter que se va comiendo), no: ahí el hueco
+        // debe subir poco a poco para que la ladera se ensanche como siempre.
+        if (this.isFree(x + 2 * dx(p), y + 2 * dy(p))) moves += this.followColumn(x, y, p, s);
         return;
       }
 
@@ -375,6 +381,48 @@ export class SandSimulation {
         this.counts.top++;
       }
       done++;
+    }
+    return done;
+  }
+
+  /**
+   * Pasa de golpe TODOS los granos que queden en el bulbo emisor al de
+   * destino (cada uno se posa donde caería, como en `transfer`).
+   *
+   * Se usa al terminar una fase de un ciclo: el tiempo de esa fase ya se ha
+   * acabado, así que su arena tiene que estar abajo. Al final siempre quedan
+   * unas decenas de granos rezagados (resbalan despacio por las paredes del
+   * embudo); si no los pasamos, al dar la vuelta al reloj quedaban colgando
+   * bajo el cuello y bajaban como un «bloque» de granos en vez de caer.
+   * @returns granos movidos.
+   */
+  flushSource(gravity: Vec2 = GRAVITY_DOWN): number {
+    const g = normalize(gravity);
+    if (Math.abs(g.y) < 0.25) return 0;
+    const dir = g.y > 0 ? 1 : -1;
+    const { cols, cells } = this;
+    let done = 0;
+    // Del cuello hacia fuera: primero los granos más cercanos al cuello.
+    for (let d = 1; d <= this.gateRow; d++) {
+      const row = this.gateRow - dir * d;
+      for (let col = 0; col < cols; col++) {
+        const src = row * cols + col;
+        if (cells[src] === 0) continue;
+        const landing = this.landingIndex(g, dir, true);
+        if (landing < 0) return done;
+        cells[landing] = cells[src] as number;
+        cells[src] = 0;
+        this.wakeAround(landing, 1);
+        this.wakeAround(src, 1);
+        if (dir > 0) {
+          this.counts.top--;
+          this.counts.bottom++;
+        } else {
+          this.counts.bottom--;
+          this.counts.top++;
+        }
+        done++;
+      }
     }
     return done;
   }
@@ -507,6 +555,41 @@ export class SandSimulation {
     this.wakeAround(from, 2);
     this.wakeAround(to, 1);
     return true;
+  }
+
+  /**
+   * Cuando un grano cae en línea recta, los granos que tenía justo encima
+   * (en contra de la gravedad) bajan con él en el mismo paso, como un bloque.
+   *
+   * Por qué: sin esto, cada grano solo se despertaba UN paso después de que
+   * se moviera el de debajo, y el aviso subía más deprisa (2 filas por paso)
+   * que la arena (1 fila por paso). Una masa que caía entera (al dar la
+   * vuelta al reloj, con el bulbo lleno) se abría en filas alternas: las
+   * rayas horizontales y el «enrejado» en V que se veían durante 1-1,5 s.
+   * Es lo mismo que hace `collapseColumn` en el cuello.
+   *
+   * Solo arrastra granos que aún no se han movido en este paso (sello `s`)
+   * y solo en línea recta: las diagonales y los deslizamientos (rozamiento,
+   * avalanchas) no cambian.
+   * @returns cuántos granos han bajado.
+   */
+  private followColumn(x: number, y: number, p: number, s: number): number {
+    const { cols, rows, cells, stamp, mask } = this;
+    let hx = x;
+    let hy = y;
+    let moved = 0;
+    for (let n = 0; n < rows; n++) {
+      const ax = hx - dx(p);
+      const ay = hy - dy(p);
+      if (ax < 0 || ay < 0 || ax >= cols || ay >= rows) break;
+      const a = ay * cols + ax;
+      if (mask[a] !== 1 || cells[a] === 0 || stamp[a] === s) break;
+      if (!this.moveTo(a, hx, hy, s)) break;
+      moved++;
+      hx = ax;
+      hy = ay;
+    }
+    return moved;
   }
 
   /** Marca un grano para procesarlo en el siguiente paso. */

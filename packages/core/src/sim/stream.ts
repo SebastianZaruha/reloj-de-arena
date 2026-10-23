@@ -45,6 +45,13 @@ export interface StreamInput {
   gravity: Vec2;
   /** Versión calmada (accesibilidad: reducir movimiento). */
   calm: boolean;
+  /**
+   * Caudal REAL de arena que pide el temporizador, en granos por segundo
+   * (granos de la tanda / duración). Opcional: sin él, el chorro se dibuja
+   * como siempre. Con mucho caudal (p. ej. un bulbo lleno que debe vaciarse
+   * en un minuto) el chorro se vuelve continuo: ver `streamContinuity`.
+   */
+  flowRate?: number;
 }
 
 export interface StreamOptions {
@@ -58,6 +65,10 @@ const GRAVITY = 520;
 const BASE_RATE = 110;
 /** Por debajo de estos granos en el bulbo emisor, el chorro adelgaza. */
 const THIN_BELOW = 70;
+/** Caudal (granos/s) hasta el que el chorro mantiene sus huecos irregulares. */
+const SPARSE_FLOW = 20;
+/** Caudal (granos/s) a partir del cual el chorro es un hilo continuo. */
+const DENSE_FLOW = 180;
 /** Paso máximo de tiempo (si la app se congela, no "teletransportamos"). */
 const MAX_DT = 1 / 20;
 
@@ -79,6 +90,8 @@ export class StreamParticles {
   readonly tone: Uint8Array;
   /** Partículas vivas: ocupan los índices 0..count-1. */
   count = 0;
+  /** Granos del chorro emitidos desde el último `reset` (para tests y medidas). */
+  emitted = 0;
 
   private rng: Rng;
   private time = 0;
@@ -107,6 +120,7 @@ export class StreamParticles {
   reset(seed = 12345): void {
     this.rng = createRng(seed);
     this.count = 0;
+    this.emitted = 0;
     this.time = 0;
     this.emitDebt = 0;
     this.swirlDebt = 0;
@@ -147,12 +161,16 @@ export class StreamParticles {
     // Ritmo irregular: ruido lento (suma de senos con fases aleatorias) que
     // a ratos casi corta el chorro y a ratos lo espesa → huecos naturales.
     const burst = 0.35 + 0.5 * Math.sin(t * 7.3 + ph[0]!) + 0.35 * Math.sin(t * 19.7 + ph[1]!);
+    // Con mucho caudal no hay huecos: el ritmo apenas oscila y hay más granos.
+    const c = streamContinuity(input.flowRate);
+    const pulse = (1 - c) * Math.max(0.04, burst) + c * (0.85 + 0.15 * Math.sin(t * 11.1 + ph[0]!));
     const calmK = input.calm ? 0.45 : 1;
-    const rate = BASE_RATE * (0.45 + 0.55 * intensity) * flow * Math.max(0.04, burst) * calmK;
+    const rate = BASE_RATE * (0.45 + 0.55 * intensity) * (1 + 1.3 * c) * flow * pulse * calmK;
     // Ancho que tiembla un poco (y se estrecha al final).
     const width =
       (0.7 + 0.3 * Math.sin(t * 5.3 + ph[2]!) + 0.15 * Math.sin(t * 17.9 + ph[3]!)) *
       (0.5 + 0.5 * flow) *
+      (1 + 0.3 * c) *
       (input.calm ? 0.6 : 1);
 
     const ex = sim.centerCol + 0.5;
@@ -162,6 +180,7 @@ export class StreamParticles {
       this.emitDebt -= 1;
       const i = this.spawn(PARTICLE_FALL);
       if (i < 0) break;
+      this.emitted++;
       const off = (rng() - 0.5) * 2 * width;
       // Perpendicular a la gravedad (para que funcione también inclinado).
       this.x[i] = ex - g.y * off * dir + g.x * rng() * 0.6;
@@ -357,6 +376,18 @@ export class StreamParticles {
     this.kind[i] = this.kind[last]!;
     this.tone[i] = this.tone[last]!;
   }
+}
+
+/**
+ * 0..1: cuánto de «hilo continuo» tiene el chorro según el caudal real.
+ * 0 con poco caudal (≤ 20 granos/s: el chorro de siempre, con huecos), 1 con
+ * mucho (≥ 180 granos/s), en escala logarítmica. Antes el aspecto solo
+ * dependía de la duración, así que un bulbo LLENO vaciándose en un minuto
+ * (fase de un ciclo) se veía igual de punteado que uno casi vacío.
+ */
+export function streamContinuity(flowRate: number | undefined): number {
+  if (flowRate === undefined || !(flowRate > SPARSE_FLOW)) return 0;
+  return clamp01(Math.log(flowRate / SPARSE_FLOW) / Math.log(DENSE_FLOW / SPARSE_FLOW));
 }
 
 function clamp01(v: number): number {

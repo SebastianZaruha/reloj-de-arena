@@ -146,8 +146,20 @@ su ángulo de reposo, el cráter del bulbo superior y los deslizamientos.
   (`granos arriba = granos iniciales × tiempo restante / duración`). La arena nunca se
   desincroniza del tiempo, aunque el móvil vaya lento.
 - Al retirar un grano del cuello, **la columna de encima baja en bloque**, como en un reloj real.
+- **Una masa cae entera (1.6):** cuando un grano cae al vacío, la columna que tiene encima baja
+  con él en el mismo paso (`followColumn`). Antes cada grano se enteraba un paso tarde y una
+  masa grande (el bulbo lleno tras dar la vuelta) se abría en filas: rayas y un enrejado en V.
+  Si el grano solo rellena un hueco de una celda (el cráter), no arrastra a nadie, así el cráter
+  conserva su ladera ancha.
+- **Fin de fase (1.6):** al cambiar de fase, los granos rezagados del embudo pasan abajo
+  (`flushSource`) antes del giro; si no, quedaban colgando bajo el cuello y bajaban en bloque.
 - Si la diferencia es enorme (vuelta de segundo plano, cambio de duración), la arena se
-  **recoloca** directamente en su estado asentado en vez de animar horas de caída.
+  **recoloca** directamente en su estado asentado en vez de animar horas de caída. El umbral
+  y los granos por fotograma se adaptan al caudal (`flowBudget`): un retraso corto con mucho
+  caudal (el giro de un cambio de fase) se recupera fluyendo, sin «reiniciar» la arena.
+- **Chorro según el caudal (1.6):** el chorro decorativo recibe el caudal real (granos/s); por
+  encima de ~20 granos/s se va cerrando y a ~180 granos/s es un hilo continuo
+  (`streamContinuity`). Con caudales normales se ve igual que en la 1.4.
 - **Rendimiento:** solo se procesan los granos «despiertos» (los que se movieron o tienen un
   vecino que se movió). La arena en reposo no cuesta nada. En Node sin JIT (parecido a
   Hermes) un fotograma con dos pasos ronda 1,5–2 ms. Cuando nada se mueve, el bucle se detiene.

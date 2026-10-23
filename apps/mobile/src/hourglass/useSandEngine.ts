@@ -38,7 +38,9 @@
 import {
   MAX_DURATION_MS,
   MIN_DURATION_MS,
+  flowBudget,
   MIN_FLOW_GRAVITY_Y,
+  nominalFlowRate,
   sandLevelForDuration,
   StreamParticles,
   syncSandToTarget,
@@ -158,6 +160,7 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
       intensity: 1,
       gravity: { x: 0, y: 1 },
       calm: false,
+      flowRate: 0,
     } as StreamInput,
     /** Marca de tiempo del fotograma anterior (para calcular dt). */
     lastTime: 0,
@@ -223,6 +226,11 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
         state.turns = turns; // primera foto o simulación nueva: nada que girar
       } else if (turns !== state.turns) {
         state.turns = turns;
+        // La fase anterior ha terminado: su arena tiene que estar abajo. Los
+        // pocos granos rezagados (resbalan despacio por el embudo) pasan ya;
+        // si no, tras el giro quedaban colgando bajo el cuello y bajaban
+        // como un bloque.
+        p.sim.flushSource(gs);
         if (p.reduceMotion) {
           // Sin animación: la arena da la vuelta en el acto.
           finishTurn(p.sim);
@@ -264,7 +272,10 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
       // (Durante el giro no: la arena va quieta dentro del vidrio.)
       if (snap.status !== 'idle' && state.turnStart === null) {
         const target = targetSourceGrains(state.runInitial, snap.remainingMs, snap.durationMs);
-        if (syncSandToTarget(p.sim, target, gs, { maxPerFrame: 8 }) !== 'idle') changed = true;
+        // Límites según el caudal: con mucha arena y poco tiempo puede pasar
+        // más por fotograma y no se recoloca por un simple retraso.
+        const budget = flowBudget(state.runInitial, snap.durationMs, p.sim.totalGrains);
+        if (syncSandToTarget(p.sim, target, gs, budget) !== 'idle') changed = true;
       }
 
       // 3) Física.
@@ -285,6 +296,8 @@ export function useSandEngine(params: SandEngineParams): SandEngineOutput {
       state.lastTime = now;
       pin.emitting = streaming;
       pin.intensity = streamIntensity(snap.durationMs);
+      // Caudal real de esta tanda: con mucho, el chorro es un hilo continuo.
+      pin.flowRate = nominalFlowRate(state.runInitial, snap.durationMs);
       pin.gravity = g;
       pin.calm = p.reduceMotion;
       particles.update(p.sim, pin);

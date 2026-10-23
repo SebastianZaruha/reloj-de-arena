@@ -76,3 +76,37 @@ export function syncSandToTarget(
   const moved = sim.transfer(Math.min(deficit, options.maxPerFrame ?? 6), g);
   return moved > 0 ? 'flowing' : 'idle';
 }
+
+/** Caudal nominal de una tanda: granos por segundo que pide el temporizador. */
+export function nominalFlowRate(initialGrains: number, durationMs: number): number {
+  if (!(durationMs > 0) || !Number.isFinite(durationMs) || !(initialGrains > 0)) return 0;
+  return (initialGrains * 1000) / durationMs;
+}
+
+/**
+ * Límites de `syncSandToTarget` adaptados al caudal de la tanda.
+ *
+ * Con los límites fijos (8 granos por fotograma, recolocar a partir del 4 %
+ * de la arena), una tanda con mucho caudal se quedaba atrás: tras el giro
+ * de un cambio de fase (950 ms sin pasar arena) o con el reloj acelerado de
+ * pruebas, el retraso superaba el umbral y la arena se RECOLOCABA de golpe
+ * (parecía que el reloj «se reiniciaba»). Ahora:
+ *   - por fotograma pueden pasar hasta 2,5 veces lo que toca (para ponerse
+ *     al día sin saltos), y nunca menos de `baseMaxPerFrame`;
+ *   - solo se recoloca si el retraso supera 1,5 s de caudal (un salto de
+ *     verdad, como volver de segundo plano), y nunca por debajo del umbral
+ *     de siempre.
+ */
+export function flowBudget(
+  initialGrains: number,
+  durationMs: number,
+  totalGrains: number,
+  baseMaxPerFrame = 8,
+): { maxPerFrame: number; teleportThreshold: number } {
+  const rate = nominalFlowRate(initialGrains, durationMs);
+  const base = Math.max(40, Math.round(totalGrains * 0.04));
+  return {
+    maxPerFrame: Math.max(baseMaxPerFrame, Math.ceil((rate / 60) * 2.5)),
+    teleportThreshold: Math.max(base, Math.round(rate * 1.5)),
+  };
+}
