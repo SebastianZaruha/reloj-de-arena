@@ -292,6 +292,7 @@ function HourglassCanvas({
     width,
     height,
     active: backdropActive,
+    moving: status === 'running',
     version: glass,
     read: () => {
       const angle = spin.get();

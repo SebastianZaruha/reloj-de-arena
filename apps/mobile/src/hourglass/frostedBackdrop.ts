@@ -15,9 +15,9 @@
  * se desenfoca a esa escala (mismo radio visual: 26 px de pantalla) y el
  * lienzo solo pinta esa imagen estirada dentro de la forma de la hoja: lo
  * más barato que hay para una GPU. Cada foto cuesta ~2 ms. Desenfocada se ve igual que a tamaño
- * completo. Se renueva unas 4 veces por segundo mientras la hoja está a la
- * vista (la arena se mueve despacio) y una vez, en reposo, al poco de montar
- * el reloj, para que al abrir ya esté lista.
+ * completo. Se renueva 4 veces por segundo mientras la hoja está a la vista
+ * (la arena se mueve despacio) y, con la hoja cerrada, cada 2 s si la arena
+ * cae: al abrir ya está lista y abrir no cuesta nada.
  */
 import {
   Skia,
@@ -27,7 +27,7 @@ import {
   type SkPicture,
   type SkSurface,
 } from '@shopify/react-native-skia';
-import { useCallback, useEffect, useLayoutEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useSharedValue, type SharedValue } from 'react-native-reanimated';
 
 import { useLatest } from '../hooks/useLatest';
@@ -134,12 +134,16 @@ export class FrostedBackdrop {
 
 /** Tras montar (o cambiar de tema o tamaño), cuándo se preparan las primeras fotos. */
 const WARM_UP_MS = [1200, 3000];
+/** Con la hoja cerrada y la arena cayendo, cada cuánto se pone al día la foto. */
+const IDLE_REFRESH_MS = 2000;
 
 interface BackdropOptions {
   readonly width: number;
   readonly height: number;
   /** ¿Está la hoja a la vista (abierta o moviéndose)? */
   readonly active: boolean;
+  /** ¿Está cayendo la arena (reloj en marcha)? */
+  readonly moving: boolean;
   /** Devuelve la escena actual (se llama solo al hacer la foto). */
   readonly read: () => BackdropScene;
   /** Cambia cuando cambia lo que se dibuja (tema, modelo, tamaño). */
@@ -147,11 +151,11 @@ interface BackdropOptions {
 }
 
 /**
- * Mantiene la foto del vidrio: una al poco de montar (lista para el primer
- * toque al menú), otra en cuanto la hoja empieza a abrirse y luego cada
- * BACKDROP_REFRESH_MS mientras se ve. Con la hoja cerrada no hace nada.
+ * Mantiene la foto del vidrio: dos al poco de montar (lista para el primer
+ * toque al menú), cada BACKDROP_REFRESH_MS mientras la hoja se ve y, con la
+ * hoja cerrada, solo cada IDLE_REFRESH_MS y si la arena está cayendo.
  */
-export function useFrostedBackdrop({ width, height, active, read, version }: BackdropOptions) {
+export function useFrostedBackdrop({ width, height, active, moving, read, version }: BackdropOptions) {
   const image = useSharedValue<SkImage | null>(null);
   const backdrop = useMemo(() => new FrostedBackdrop(width, height, image), [width, height, image]);
   useEffect(() => () => backdrop.dispose(), [backdrop]);
@@ -172,13 +176,14 @@ export function useFrostedBackdrop({ width, height, active, read, version }: Bac
     return () => ids.forEach(clearTimeout);
   }, [shoot, version]);
 
-  // useLayoutEffect: la foto se renueva ANTES del primer fotograma de la hoja.
-  useLayoutEffect(() => {
-    if (!active) return;
-    shoot();
-    const id = setInterval(shoot, BACKDROP_REFRESH_MS);
+  // Con la hoja a la vista, 4 fotos por segundo. Cerrada y con la arena
+  // cayendo, una cada 2 s: así al abrir la foto ya está casi al día y no hay
+  // que hacerla en el momento del toque (leerla de la GPU frena un poco).
+  useEffect(() => {
+    if (!active && !moving) return;
+    const id = setInterval(shoot, active ? BACKDROP_REFRESH_MS : IDLE_REFRESH_MS);
     return () => clearInterval(id);
-  }, [active, shoot]);
+  }, [active, moving, shoot]);
 
   return image;
 }
